@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Die amtlichen Warnungen (NINA/BBK) werden beim Bauen der Seite geladen
+  # (die API hat kein CORS, ein Live-Fetch im Browser ist nicht möglich) und
+  # damit nur bei jedem Deployment aktualisiert. Ein regelmäßiger Zeitplan
+  # hält sie halbwegs aktuell, ohne einen eigenen Server zu brauchen.
+  schedule:
+    - cron: "*/30 * * * *"
 
 permissions:
   contents: read

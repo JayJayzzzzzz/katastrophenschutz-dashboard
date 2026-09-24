@@ -1,7 +1,106 @@
 ---
 // Katastrophenschutz Berlin — Lagebild-Dashboard
-// Statische Astro-Seite; alle Live-Daten werden im Browser nachgeladen
+// Statische Astro-Seite; die meisten Live-Daten werden im Browser nachgeladen
 // (siehe src/scripts/dashboard.js) — passt zu einem reinen GitHub-Pages-Hosting.
+//
+// Die amtlichen Warnungen (NINA/BBK) sind die eine Ausnahme: deren API hat
+// kein CORS und lässt sich daher nicht per Browser-Fetch abrufen. Sie werden
+// stattdessen HIER, im Astro-Frontmatter, beim Bauen der Seite geladen
+// (serverseitig in Node — CORS betrifft nur Browser) und als fertiges HTML
+// ausgeliefert. Der GitHub-Actions-Workflow baut die Seite deshalb auch nach
+// einem Zeitplan neu, damit die Warnungen halbwegs aktuell bleiben.
+
+const NINA_AGS = "110000000000"; // Berlin, Bundesland-Ebene
+
+const SEVERITY_STATUS: Record<string, { cls: string; label: string }> = {
+	Extreme: { cls: "aqi-critical", label: "Extrem" },
+	Severe: { cls: "aqi-serious", label: "Schwer" },
+	Moderate: { cls: "aqi-warning", label: "Mittel" },
+	Minor: { cls: "aqi-good", label: "Gering" },
+};
+const SEVERITY_ORDER: Record<string, number> = { Extreme: 4, Severe: 3, Moderate: 2, Minor: 1 };
+
+function formatDe(iso: string | null | undefined) {
+	if (!iso) return "–";
+	return new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + " Uhr";
+}
+
+interface Warning {
+	id: string;
+	headline: string;
+	severity: string;
+	senderName: string;
+	onset: string | null;
+	expires: string | null;
+	description: string;
+	instruction: string | null;
+	areaDesc: string | null;
+}
+
+let warnings: Warning[] = [];
+let warningsError = false;
+
+try {
+	const listRes = await fetch(`https://warnung.bund.de/api31/dashboard/${NINA_AGS}.json`);
+	if (!listRes.ok) throw new Error(`Dashboard-Liste: HTTP ${listRes.status}`);
+	const list: any[] = await listRes.json();
+
+	const details = await Promise.all(
+		list.slice(0, 12).map(async (entry: any): Promise<Warning | null> => {
+			try {
+				const res = await fetch(`https://warnung.bund.de/api31/warnings/${encodeURIComponent(entry.id)}.json`);
+				if (!res.ok) return null;
+				const detail: any = await res.json();
+				const info = (detail.info || []).find((i: any) => i.language?.startsWith("de")) || detail.info?.[0];
+				if (!info) return null;
+				return {
+					id: entry.id,
+					headline: info.headline,
+					severity: info.severity,
+					senderName: info.senderName,
+					onset: info.onset,
+					expires: info.expires,
+					description: info.description,
+					instruction: info.instruction,
+					areaDesc: info.area?.[0]?.areaDesc,
+				};
+			} catch {
+				return null;
+			}
+		})
+	);
+
+	warnings = (details.filter(Boolean) as Warning[]).sort(
+		(a, b) => (SEVERITY_ORDER[b.severity] || 0) - (SEVERITY_ORDER[a.severity] || 0)
+	);
+} catch (error) {
+	console.error("NINA-Warnungen konnten beim Build nicht geladen werden:", error);
+	warningsError = true;
+}
+
+if (process.env.DASHBOARD_TEST_WARNING === "1") {
+	warnings = [
+		{
+			id: "test-1",
+			severity: "Severe",
+			headline: "Amtliche WARNUNG vor STURMBÖEN",
+			senderName: "Deutscher Wetterdienst",
+			onset: new Date().toISOString(),
+			expires: new Date(Date.now() + 3600_000).toISOString(),
+			description: "Es treten Sturmböen mit Geschwindigkeiten um 65 km/h auf.",
+			instruction: "Objekte sichern.<br/>Vorsicht bei herabfallenden Ästen.",
+			areaDesc: "Berlin",
+		},
+	];
+}
+
+const buildStamp = new Date().toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+const warningsStatus = warningsError
+	? { cls: "", label: "Keine Daten" }
+	: warnings.length > 0
+		? SEVERITY_STATUS[warnings[0].severity] || SEVERITY_STATUS.Minor
+		: { cls: "aqi-good", label: "Keine aktiv" };
 ---
 
 <html lang="de">
@@ -36,6 +135,7 @@
 			<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6l7-3z"/><path d="M9 12l2 2 4-4"/></symbol>
 			<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
 			<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+			<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19L12 3.5z"/><path d="M12 10v4.2"/><circle cx="12" cy="17.3" r="0.6" fill="currentColor" stroke="none"/></symbol>
 		</defs>
 	</svg>
 
@@ -93,12 +193,21 @@
 				</div>
 			</section>
 
-			<section class="stat s-air" aria-label="Luftqualität (relevant bei Rauchbelastung durch Brände)">
-				<div class="k"><svg class="ic" id="aqiIcon"><use href="#i-shield"/></svg>Luftqualität</div>
-				<div class="v" id="aqiValue">--</div>
-				<div class="sub" id="aqiDetail">Lädt …</div>
-				<div class="sub muted" id="aqiSub"></div>
-			</section>
+			<div class="stack-col" style="grid-area: air;">
+				<section class="mini-stat" aria-label="Luftqualität (relevant bei Rauchbelastung durch Brände)">
+					<div class="k"><svg class="ic" id="aqiIcon"><use href="#i-shield"/></svg>Luftqualität</div>
+					<div class="v" id="aqiValue">--</div>
+					<div class="sub" id="aqiDetail">Lädt …</div>
+				</section>
+
+				<button type="button" class="mini-stat mini-stat-btn" id="warningsOpen" aria-haspopup="dialog">
+					<div class="k"><svg class="ic"><use href="#i-alert"/></svg>Warnungen</div>
+					<div class:list={["v", warningsStatus.cls]}>
+						{warningsError ? "Keine Daten" : warnings.length > 0 ? `${warnings.length} aktiv` : "Keine aktiv"}
+					</div>
+					<div class="sub">{warnings.length > 0 ? warnings[0].headline : "Bund/DWD für Berlin"}</div>
+				</button>
+			</div>
 
 			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf">
 				<div class="chart-head"><span>24-Std.-Verlauf</span><b id="chartNow">--°</b></div>
@@ -137,6 +246,41 @@
 				<div class="dm-stat"><div class="dm-k">UV-Index (max.)</div><div class="dm-v" id="dayModalUV">--</div></div>
 				<div class="dm-stat"><div class="dm-k">Sonnenauf-/-untergang</div><div class="dm-v" id="dayModalSun">--</div></div>
 			</div>
+		</div>
+	</div>
+
+	<div class="day-modal" id="warnModal" hidden>
+		<div class="day-modal-backdrop" id="warnModalBackdrop"></div>
+		<div class="day-modal-panel warn-modal-panel" role="dialog" aria-modal="true" aria-labelledby="warnModalTitle">
+			<button class="day-modal-close" id="warnModalClose" aria-label="Schließen">
+				<svg class="ic"><use href="#i-close"/></svg>
+			</button>
+			<h2 id="warnModalTitle">Amtliche Warnungen · Berlin</h2>
+
+			{warningsError ? (
+				<p class="warn-empty">Die Warnungen (NINA/BBK) konnten beim letzten Build der Seite nicht geladen werden. Das ist keine Aussage darüber, ob gerade eine Warnung besteht — bitte zusätzlich <a href="https://warnung.bund.de" target="_blank" rel="noopener">warnung.bund.de</a> prüfen.</p>
+			) : warnings.length === 0 ? (
+				<p class="warn-empty">Aktuell liegen keine amtlichen Warnungen (NINA/DWD/BBK) für Berlin vor.</p>
+			) : (
+				<div class="warn-list">
+					{warnings.map((w) => (
+						<article class="warn-card">
+							<div class="warn-card-head">
+								<span class:list={["warn-badge", (SEVERITY_STATUS[w.severity] || SEVERITY_STATUS.Minor).cls]}>
+									{(SEVERITY_STATUS[w.severity] || SEVERITY_STATUS.Minor).label}
+								</span>
+								<span class="warn-time">gültig bis {formatDe(w.expires)}</span>
+							</div>
+							<h3>{w.headline}</h3>
+							{w.description && <p class="warn-desc">{w.description}</p>}
+							{w.instruction && <p class="warn-instr" set:html={w.instruction} />}
+							<p class="warn-meta">{w.senderName}{w.areaDesc ? ` · ${w.areaDesc}` : ""}</p>
+						</article>
+					))}
+				</div>
+			)}
+
+			<p class="warn-footnote">Quelle: NINA / Bund (warnung.bund.de) · Stand des letzten Seiten-Builds: {buildStamp}</p>
 		</div>
 	</div>
 
@@ -352,13 +496,52 @@
 			--icon-color: var(--series-fire);
 		}
 
-		.stat.s-air {
-			grid-area: air;
-			justify-content: center;
-			gap: 6px;
+		.stack-col {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			min-height: 0;
 		}
 
-		.stat .k {
+		.mini-stat {
+			flex: 1;
+			background: var(--panel);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow-out);
+			padding: 12px 16px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			gap: 4px;
+			min-height: 0;
+			overflow: hidden;
+		}
+
+		.mini-stat-btn {
+			border: none;
+			font: inherit;
+			color: var(--text);
+			text-align: left;
+			cursor: pointer;
+			width: 100%;
+			transition: box-shadow 0.15s ease, transform 0.15s ease;
+		}
+
+		.mini-stat-btn:hover,
+		.mini-stat-btn:focus-visible {
+			transform: translateY(-2px);
+			box-shadow: var(--shadow-out), 0 0 0 2px var(--series-fire);
+			outline: none;
+		}
+
+		.mini-stat .sub {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.stat .k,
+		.mini-stat .k {
 			display: flex;
 			align-items: center;
 			gap: 7px;
@@ -368,14 +551,20 @@
 			color: var(--muted);
 		}
 
-		.stat .k .ic {
+		.stat .k .ic,
+		.mini-stat .k .ic {
 			color: var(--icon-color, var(--accent));
 		}
 
-		.stat .v {
+		.stat .v,
+		.mini-stat .v {
 			font-weight: 800;
 			font-size: clamp(1.3rem, 2vw, 1.7rem);
 			font-variant-numeric: tabular-nums;
+		}
+
+		.mini-stat .v {
+			font-size: 1.05rem;
 		}
 
 		.stat .v .unit {
@@ -387,7 +576,8 @@
 			margin-left: 4px;
 		}
 
-		.stat .sub {
+		.stat .sub,
+		.mini-stat .sub {
 			font-size: 12.5px;
 			color: var(--muted);
 		}
@@ -674,6 +864,115 @@
 			font-weight: 800;
 			font-size: 15px;
 			font-variant-numeric: tabular-nums;
+		}
+
+		/* ---------- Warnungen-Modal ---------- */
+
+		.warn-modal-panel {
+			width: min(560px, 100%);
+		}
+
+		.warn-modal-panel h2 {
+			font-size: 17px;
+			font-weight: 800;
+			margin-bottom: 14px;
+			padding-right: 30px;
+		}
+
+		.warn-empty {
+			color: var(--muted);
+			font-size: 14px;
+			line-height: 1.5;
+		}
+
+		.warn-empty a {
+			color: var(--series-weather);
+		}
+
+		.warn-list {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+
+		.warn-card {
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			border-radius: 16px;
+			padding: 14px 16px;
+		}
+
+		.warn-card-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 10px;
+			margin-bottom: 8px;
+		}
+
+		.warn-badge {
+			font-size: 11px;
+			font-weight: 800;
+			letter-spacing: 0.03em;
+			text-transform: uppercase;
+			padding: 3px 9px;
+			border-radius: 999px;
+		}
+
+		.warn-badge.aqi-good {
+			background: rgba(12, 163, 12, 0.18);
+			color: var(--status-good);
+		}
+		.warn-badge.aqi-warning {
+			background: rgba(250, 178, 25, 0.18);
+			color: var(--status-warning);
+		}
+		.warn-badge.aqi-serious {
+			background: rgba(236, 131, 90, 0.18);
+			color: var(--status-serious);
+		}
+		.warn-badge.aqi-critical {
+			background: rgba(208, 59, 59, 0.2);
+			color: var(--status-critical);
+		}
+
+		.warn-time {
+			font-size: 11.5px;
+			color: var(--muted);
+			white-space: nowrap;
+		}
+
+		.warn-card h3 {
+			font-size: 15px;
+			font-weight: 800;
+			margin-bottom: 6px;
+			text-wrap: balance;
+		}
+
+		.warn-desc,
+		.warn-instr {
+			font-size: 13.5px;
+			color: var(--text);
+			line-height: 1.5;
+			margin-bottom: 8px;
+		}
+
+		.warn-instr {
+			color: var(--muted);
+		}
+
+		.warn-meta {
+			font-size: 11.5px;
+			color: var(--muted);
+			opacity: 0.8;
+		}
+
+		.warn-footnote {
+			margin-top: 16px;
+			font-size: 11px;
+			color: var(--muted);
+			opacity: 0.7;
+			line-height: 1.4;
 		}
 
 		/* ---------- Responsive: Tablet ---------- */

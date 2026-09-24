@@ -583,6 +583,25 @@ async function loadAirQuality() {
   }
 }
 
+// ---------- Warnungen-Modal ----------
+// Die Warnungen selbst werden bereits beim Bauen der Seite serverseitig
+// geladen und fertig ins HTML gerendert (siehe index.astro) — hier wird nur
+// noch geöffnet/geschlossen.
+
+function openWarnings() {
+  const modal = $("warnModal");
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  $("warnModalClose")?.focus();
+}
+
+function closeWarnings() {
+  const modal = $("warnModal");
+  if (modal) modal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
 // ---------- Start ----------
 
 function refreshAll() {
@@ -594,8 +613,13 @@ function refreshAll() {
 
 $("dayModalClose")?.addEventListener("click", closeDayDetail);
 $("dayModalBackdrop")?.addEventListener("click", closeDayDetail);
+$("warningsOpen")?.addEventListener("click", openWarnings);
+$("warnModalClose")?.addEventListener("click", closeWarnings);
+$("warnModalBackdrop")?.addEventListener("click", closeWarnings);
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("dayModal")?.hidden) closeDayDetail();
+  if (e.key !== "Escape") return;
+  if (!$("dayModal")?.hidden) closeDayDetail();
+  if (!$("warnModal")?.hidden) closeWarnings();
 });
 
 window.addEventListener("resize", debounce(redrawAllCharts, 150));
