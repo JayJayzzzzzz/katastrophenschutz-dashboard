@@ -136,6 +136,8 @@ const warningsStatus = warningsError
 			<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
 			<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 			<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19L12 3.5z"/><path d="M12 10v4.2"/><circle cx="12" cy="17.3" r="0.6" fill="currentColor" stroke="none"/></symbol>
+			<symbol id="i-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-2"/><path d="M9 2h6"/><path d="M12 2v2"/></symbol>
+			<symbol id="i-siren" viewBox="0 0 24 24"><path d="M12 4a5 5 0 0 1 5 5v3H7V9a5 5 0 0 1 5-5z"/><path d="M5 15.5h14l1 4.5H4l1-4.5z"/><path d="M12 2v1"/></symbol>
 		</defs>
 	</svg>
 
@@ -215,6 +217,22 @@ const warningsStatus = warningsError
 					<svg id="weatherChart" preserveAspectRatio="none" aria-hidden="true"></svg>
 					<div id="chartTooltip" class="chart-tooltip" hidden></div>
 				</div>
+			</section>
+
+			<section class="stat s-resptime" aria-label="Durchschnittliche Reaktionszeit der Feuerwehr, letzte 30 Tage">
+				<div class="k"><svg class="ic"><use href="#i-stopwatch"/></svg>Ø Reaktionszeit (30 Tage)</div>
+				<div class="v"><span id="respTimeValue">--</span></div>
+				<div class="sub">Eintreffen 1. Löschfahrzeug</div>
+				<div class="mini-chart">
+					<svg id="respTimeChart" aria-hidden="true"></svg>
+					<div id="respTimeTooltip" class="chart-tooltip" hidden></div>
+				</div>
+			</section>
+
+			<section class="stat s-total" aria-label="Gesamteinsätze der Berliner Feuerwehr, Vortag">
+				<div class="k"><svg class="ic"><use href="#i-siren"/></svg>Gesamteinsätze</div>
+				<div class="v"><span id="totalMissionsValue">--</span></div>
+				<div class="sub">alle Kategorien · am <span id="fireDate2">--</span></div>
 			</section>
 
 			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage, zum Aufklappen antippen"></section>
@@ -337,11 +355,11 @@ const warningsStatus = warningsError
 			height: 100%;
 			display: grid;
 			grid-template-columns: 1.3fr 1fr 1fr 0.95fr;
-			grid-template-rows: auto 1.25fr 0.72fr auto;
+			grid-template-rows: auto 1.2fr 0.68fr auto;
 			grid-template-areas:
 				"top top top top"
 				"hero pegel fire air"
-				"chart chart chart chart"
+				"chart chart resptime total"
 				"forecast forecast forecast forecast";
 			gap: 14px;
 		}
@@ -494,6 +512,20 @@ const warningsStatus = warningsError
 		.stat.s-fire {
 			grid-area: fire;
 			--icon-color: var(--series-fire);
+		}
+
+		.stat.s-resptime {
+			grid-area: resptime;
+			--icon-color: var(--series-fire);
+			padding: 12px 16px;
+			gap: 3px;
+		}
+
+		.stat.s-total {
+			grid-area: total;
+			--icon-color: var(--muted);
+			justify-content: center;
+			padding: 14px 18px;
 		}
 
 		.stack-col {
@@ -1000,6 +1032,7 @@ const warningsStatus = warningsError
 					"pegel fire"
 					"air air"
 					"chart chart"
+					"resptime total"
 					"forecast forecast";
 				gap: 12px;
 			}
@@ -1012,6 +1045,11 @@ const warningsStatus = warningsError
 			.chart-box {
 				height: 220px;
 				padding: 14px 18px 10px;
+			}
+
+			.stat.s-resptime,
+			.stat.s-total {
+				min-height: 130px;
 			}
 
 			.forecast {
@@ -1036,6 +1074,8 @@ const warningsStatus = warningsError
 					"fire"
 					"air"
 					"chart"
+					"resptime"
+					"total"
 					"forecast";
 				gap: 10px;
 			}

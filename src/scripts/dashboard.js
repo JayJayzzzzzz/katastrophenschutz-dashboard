@@ -142,7 +142,12 @@ function drawLineChart(svg, tooltip, values, labels, opts) {
     const n = opts.xLabelCount;
     const idxs = [...new Set(Array.from({ length: n }, (_, i) => Math.round((i * (nums.length - 1)) / (n - 1))))];
     xLabelsSvg = idxs
-      .map((i) => `<text x="${xFor(i)}" y="${h - 5}" text-anchor="middle" fill="var(--muted)" font-size="10.5">${opts.xLabelFormatter(labels[i])}</text>`)
+      .map((i) => {
+        // Am linken/rechten Rand nicht mittig verankern, sonst schneidet der
+        // Container die Hälfte des Textes ab (besonders bei knappem Padding).
+        const anchor = i === 0 ? "start" : i === nums.length - 1 ? "end" : "middle";
+        return `<text x="${xFor(i)}" y="${h - 5}" text-anchor="${anchor}" fill="var(--muted)" font-size="10.5">${opts.xLabelFormatter(labels[i])}</text>`;
+      })
       .join("");
   }
 
@@ -321,7 +326,7 @@ async function loadWeather() {
           color: "var(--series-weather)",
           unitShort: "°",
           yTicks: 2,
-          xLabelCount: 4,
+          xLabelCount: 3,
           nowLabelId: "chartNow",
           valueFormatter: (v) => Math.round(v) + "°C",
           labelFormatter: (t) => formatClock(t),
@@ -439,15 +444,29 @@ function parseFireCsv(csvText) {
   const headers = rows[0].split(",");
   const dateIndex = headers.indexOf("mission_created_date");
   const fireIndex = headers.indexOf("mission_count_fire");
+  const allIndex = headers.indexOf("mission_count_all");
+  const responseTimeIndex = headers.indexOf("response_time_fire_time_to_first_pump_mean");
   if (dateIndex === -1 || fireIndex === -1) return [];
+
+  const num = (values, index) => {
+    if (index === -1) return null;
+    const n = Number(values[index]);
+    return Number.isFinite(n) ? n : null;
+  };
 
   return rows
     .slice(1)
     .map((row) => {
       const values = row.split(",");
       const date = (values[dateIndex] || "").trim();
-      const fireCount = Number(values[fireIndex] || 0);
-      return { date, fireCount: Number.isFinite(fireCount) ? fireCount : 0 };
+      return {
+        date,
+        fireCount: num(values, fireIndex) || 0,
+        missionsAll: num(values, allIndex),
+        // Sekunden -> Minuten: die CSV liefert die Eintreffzeit des ersten
+        // Löschfahrzeugs in Sekunden.
+        responseTimeMin: responseTimeIndex !== -1 && num(values, responseTimeIndex) != null ? num(values, responseTimeIndex) / 60 : null,
+      };
     })
     .filter((entry) => entry.date && entry.date.length >= 8)
     .sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -473,6 +492,7 @@ async function loadFireCount() {
 
     setText("fireCount", Math.round(latest.fireCount));
     setText("fireDate", formatDisplayDate(latest.date));
+    setText("fireDate2", formatDisplayDate(latest.date));
 
     if (last14.length) {
       registerChart("fire", $("fireChart"), $("fireTooltip"), () =>
@@ -493,10 +513,50 @@ async function loadFireCount() {
       );
       charts.fire.draw();
     }
+
+    // Gesamteinsätze (alle Kategorien: Rettungsdienst, Brände, technische
+    // Hilfe, …) am selben Tag wie oben — eine einfache zusätzliche Kennzahl.
+    if (latest.missionsAll != null) {
+      setText("totalMissionsValue", Math.round(latest.missionsAll).toLocaleString("de-DE"));
+    } else {
+      setText("totalMissionsValue", "--");
+    }
+
+    // Ø Reaktionszeit (Eintreffzeit erstes Löschfahrzeug) über die letzten
+    // 30 vollständigen Tage — "des letzten Monats".
+    const last30 = completeRows.slice(-30).filter((r) => r.responseTimeMin != null);
+    if (last30.length) {
+      const avgMin = last30.reduce((sum, r) => sum + r.responseTimeMin, 0) / last30.length;
+      setText("respTimeValue", avgMin.toLocaleString("de-DE", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + " Min");
+
+      registerChart("respTime", $("respTimeChart"), $("respTimeTooltip"), () =>
+        drawLineChart(
+          $("respTimeChart"),
+          $("respTimeTooltip"),
+          last30.map((r) => r.responseTimeMin),
+          last30.map((r) => r.date),
+          {
+            id: "resptime",
+            color: "var(--series-fire)",
+            grid: false,
+            padding: { top: 6, right: 4, bottom: 16, left: 4 },
+            xLabelCount: 2,
+            valueFormatter: (v) => v.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " Min",
+            labelFormatter: (d) => formatDisplayDate(d),
+            xLabelFormatter: (d) => formatShortDate(d),
+          }
+        )
+      );
+      charts.respTime.draw();
+    } else {
+      setText("respTimeValue", "--");
+    }
   } catch (error) {
     console.error(error);
     setText("fireCount", "--");
     setText("fireDate", "--");
+    setText("totalMissionsValue", "--");
+    setText("respTimeValue", "--");
   }
 }
 
