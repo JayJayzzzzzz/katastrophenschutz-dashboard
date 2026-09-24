@@ -138,6 +138,7 @@ const warningsStatus = warningsError
 			<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19L12 3.5z"/><path d="M12 10v4.2"/><circle cx="12" cy="17.3" r="0.6" fill="currentColor" stroke="none"/></symbol>
 			<symbol id="i-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-2"/><path d="M9 2h6"/><path d="M12 2v2"/></symbol>
 			<symbol id="i-siren" viewBox="0 0 24 24"><path d="M12 4a5 5 0 0 1 5 5v3H7V9a5 5 0 0 1 5-5z"/><path d="M5 15.5h14l1 4.5H4l1-4.5z"/><path d="M12 2v1"/></symbol>
+			<symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2z"/><path d="M9 4v14M15 6v14"/></symbol>
 		</defs>
 	</svg>
 
@@ -245,11 +246,19 @@ const warningsStatus = warningsError
 				</div>
 			</section>
 
-			<section class="stat s-total" aria-label="Gesamteinsätze der Berliner Feuerwehr, Vortag">
-				<div class="k"><svg class="ic"><use href="#i-siren"/></svg>Gesamteinsätze</div>
-				<div class="v"><span id="totalMissionsValue">--</span></div>
-				<div class="sub">alle Kategorien · am <span id="fireDate2">--</span></div>
-			</section>
+			<div class="stack-col" style="grid-area: total;">
+				<section class="stat tile-half" aria-label="Gesamteinsätze der Berliner Feuerwehr, Vortag">
+					<div class="k"><svg class="ic"><use href="#i-siren"/></svg>Gesamteinsätze</div>
+					<div class="v"><span id="totalMissionsValue">--</span></div>
+					<div class="sub">alle Kategorien · am <span id="fireDate2">--</span></div>
+				</section>
+
+				<button type="button" class="stat tile-half tile-half-btn" id="hazardMapOpen" aria-haspopup="dialog">
+					<div class="k"><svg class="ic"><use href="#i-map"/></svg>Gefahrenkarte</div>
+					<div class="v">Hochwasser</div>
+					<div class="sub">Amtliche Karte ansehen</div>
+				</button>
+			</div>
 
 			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage, zum Aufklappen antippen"></section>
 		</div>
@@ -315,6 +324,29 @@ const warningsStatus = warningsError
 			)}
 
 			<p class="warn-footnote">Quelle: NINA / Bund (warnung.bund.de) · Stand des letzten Seiten-Builds: {buildStamp}</p>
+		</div>
+	</div>
+
+	<div class="day-modal" id="hazardModal" hidden>
+		<div class="day-modal-backdrop" id="hazardModalBackdrop"></div>
+		<div class="day-modal-panel hazard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="hazardModalTitle">
+			<button class="day-modal-close" id="hazardModalClose" aria-label="Schließen">
+				<svg class="ic"><use href="#i-close"/></svg>
+			</button>
+			<h2 id="hazardModalTitle">Hochwassergefahrenkarte · Berlin</h2>
+			<p class="hazard-sub">
+				Amtliche Karte des Umweltatlas Berlin: Gewässerabschnitte, für die eine Hochwassergefahr amtlich ausgewiesen ist,
+				in drei Wahrscheinlichkeits-Szenarien (häufig, mittel, extrem). Dunklere Blautöne zeigen eine größere Wassertiefe im jeweiligen Szenario.
+			</p>
+			<div class="hazard-map-wrap">
+				<img class="hazard-layer" src="https://gdi.berlin.de/services/wms/alkis_bezirke?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=bezirksgrenzen&STYLES=&CRS=EPSG:4326&BBOX=52.33,13.08,52.68,13.76&WIDTH=900&HEIGHT=763&FORMAT=image/png&TRANSPARENT=TRUE" alt="Bezirksgrenzen Berlin" loading="lazy" />
+				<img class="hazard-layer" src="https://gdi.berlin.de/services/wms/ua_hochwassergefahrenkarten?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=c_hwgk_niedrig,b_hwgk_mittel,a_hwgk_hoch&STYLES=,,&CRS=EPSG:4326&BBOX=52.33,13.08,52.68,13.76&WIDTH=900&HEIGHT=763&FORMAT=image/png&TRANSPARENT=TRUE" alt="Hochwassergefahrenkarte (Umweltatlas Berlin)" loading="lazy" />
+			</div>
+			<p class="warn-footnote">
+				Quelle: <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a>
+				(Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen) · statische amtliche Gefahrenkarte, keine Live-Daten zu einem laufenden Einsatz ·
+				<a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Vollständige interaktive Karte öffnen ↗</a>
+			</p>
 		</div>
 	</div>
 
@@ -537,11 +569,37 @@ const warningsStatus = warningsError
 			gap: 3px;
 		}
 
-		.stat.s-total {
-			grid-area: total;
+		.stack-col {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			min-height: 0;
+		}
+
+		.stat.tile-half {
+			flex: 1;
+			padding: 10px 16px;
+			gap: 2px;
+			min-height: 0;
 			--icon-color: var(--muted);
 			justify-content: center;
-			padding: 14px 18px;
+		}
+
+		.tile-half-btn {
+			border: none;
+			font: inherit;
+			color: var(--text);
+			text-align: left;
+			cursor: pointer;
+			width: 100%;
+			transition: box-shadow 0.15s ease, transform 0.15s ease;
+		}
+
+		.tile-half-btn:hover,
+		.tile-half-btn:focus-visible {
+			transform: translateY(-2px);
+			box-shadow: var(--shadow-out), 0 0 0 2px var(--series-pegel);
+			outline: none;
 		}
 
 		.hero-icon-col {
@@ -1063,6 +1121,47 @@ const warningsStatus = warningsError
 			line-height: 1.4;
 		}
 
+		.warn-footnote a {
+			color: var(--series-pegel);
+			opacity: 1;
+		}
+
+		/* ---------- Gefahrenkarte-Modal ---------- */
+
+		.hazard-modal-panel {
+			width: min(720px, 100%);
+		}
+
+		.hazard-modal-panel h2 {
+			font-size: 17px;
+			font-weight: 800;
+			margin-bottom: 8px;
+			padding-right: 30px;
+		}
+
+		.hazard-sub {
+			font-size: 13px;
+			color: var(--muted);
+			line-height: 1.5;
+			margin-bottom: 14px;
+		}
+
+		.hazard-map-wrap {
+			position: relative;
+			width: 100%;
+			aspect-ratio: 900 / 763;
+			background: #eef2f5;
+			border-radius: 14px;
+			overflow: hidden;
+		}
+
+		.hazard-layer {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+		}
+
 		/* ---------- Responsive: Tablet ---------- */
 
 		@media (max-width: 1100px) {
@@ -1103,9 +1202,12 @@ const warningsStatus = warningsError
 				padding: 14px 18px 10px;
 			}
 
-			.stat.s-resptime,
-			.stat.s-total {
+			.stat.s-resptime {
 				min-height: 130px;
+			}
+
+			.stack-col {
+				min-height: 220px;
 			}
 
 			.forecast {

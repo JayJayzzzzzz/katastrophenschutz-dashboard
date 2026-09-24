@@ -662,6 +662,24 @@ function closeWarnings() {
   document.body.classList.remove("modal-open");
 }
 
+// ---------- Gefahrenkarte-Modal ----------
+// Die Karte ist ein statisches WMS-Kartenbild (Umweltatlas Berlin), direkt
+// als <img> im HTML verlinkt — kein Fetch/JS für die Daten nötig.
+
+function openHazardMap() {
+  const modal = $("hazardModal");
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  $("hazardModalClose")?.focus();
+}
+
+function closeHazardMap() {
+  const modal = $("hazardModal");
+  if (modal) modal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
 // ---------- Start ----------
 
 function refreshAll() {
@@ -676,10 +694,14 @@ $("dayModalBackdrop")?.addEventListener("click", closeDayDetail);
 $("warningsOpen")?.addEventListener("click", openWarnings);
 $("warnModalClose")?.addEventListener("click", closeWarnings);
 $("warnModalBackdrop")?.addEventListener("click", closeWarnings);
+$("hazardMapOpen")?.addEventListener("click", openHazardMap);
+$("hazardModalClose")?.addEventListener("click", closeHazardMap);
+$("hazardModalBackdrop")?.addEventListener("click", closeHazardMap);
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("dayModal")?.hidden) closeDayDetail();
   if (!$("warnModal")?.hidden) closeWarnings();
+  if (!$("hazardModal")?.hidden) closeHazardMap();
 });
 
 window.addEventListener("resize", debounce(redrawAllCharts, 150));
