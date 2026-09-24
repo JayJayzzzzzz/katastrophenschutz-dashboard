@@ -150,6 +150,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			<symbol id="i-a11y" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="8" r="1.5" fill="currentColor" stroke="none"/><path d="M7 11.3c1.6.8 3.4 1.2 5 1.2s3.4-.4 5-1.2M12 12.5V17M9.5 20l2.5-3 2.5 3"/></symbol>
 			<symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
 			<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/></symbol>
+			<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none"/><path d="M12 11v5.5"/></symbol>
 		</defs>
 	</svg>
 
@@ -163,7 +164,10 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 						<span id="liveDate">–</span> · <span id="liveClock">--:--:--</span>
 						<span class="live-dot" aria-hidden="true"></span>
 					</div>
-					<button type="button" class="a11y-open" id="a11yOpen" aria-haspopup="dialog" data-i18n-aria="a11yBtnAria" aria-label="Barrierefreiheit-Einstellungen">
+					<button type="button" class="icon-btn" id="helpOpen" aria-haspopup="dialog" data-i18n-aria="helpBtnAria" aria-label="Kurzanleitung &amp; Quellen">
+						<svg class="ic"><use href="#i-info"/></svg>
+					</button>
+					<button type="button" class="icon-btn" id="a11yOpen" aria-haspopup="dialog" data-i18n-aria="a11yBtnAria" aria-label="Barrierefreiheit-Einstellungen">
 						<svg class="ic"><use href="#i-a11y"/></svg>
 					</button>
 				</div>
@@ -323,6 +327,43 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				(<span data-i18n="hazardSourceOrg">Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen</span>) · <span data-i18n="hazardStaticNote">statische amtliche Gefahrenkarte, keine Live-Daten zu einem laufenden Einsatz</span> ·
 				<a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener" data-i18n="hazardFullMapLink">Vollständige interaktive Karte öffnen ↗</a>
 			</p>
+		</div>
+	</div>
+
+	<div class="day-modal" id="helpPanel" hidden>
+		<div class="day-modal-backdrop" id="helpPanelBackdrop"></div>
+		<div class="day-modal-panel help-panel-box" role="dialog" aria-modal="true" aria-labelledby="helpPanelTitle">
+			<button class="day-modal-close" id="helpPanelClose" aria-label="Schließen" data-i18n-aria="close">
+				<svg class="ic"><use href="#i-close"/></svg>
+			</button>
+			<h2 id="helpPanelTitle" data-i18n="helpTitle">Kurzanleitung &amp; Quellen</h2>
+
+			<h3 class="help-heading" data-i18n="helpUsageHeading">So funktioniert das Dashboard</h3>
+			<ul class="help-list">
+				<li data-i18n="helpUsage1">Die Kacheln zeigen den aktuellen Stand automatisch an — nichts muss angeklickt werden, um Werte zu sehen.</li>
+				<li data-i18n="helpUsage2">„Warnungen", „Gefahrenkarte" und jeder Tag in der 7-Tage-Vorhersage sind anklickbar und öffnen weitere Details.</li>
+				<li data-i18n="helpUsage3">Wetter, Pegel, Brände und Luftqualität aktualisieren sich automatisch alle 5 Minuten, die Uhrzeit jede Sekunde — ein Neuladen der Seite ist dafür nicht nötig.</li>
+				<li data-i18n="helpUsage4">Amtliche Warnungen werden beim Bauen der Seite geladen und können bis zu 30 Minuten alt sein; bei einem lange geöffneten Tab hilft ein Neuladen der Seite.</li>
+				<li data-i18n="helpUsage5">Auf einem Leitstellen-Monitor passt alles ohne Scrollen auf einen Bildschirm; auf Tablet/Smartphone lässt sich die Seite normal scrollen.</li>
+				<li data-i18n="helpUsage6">Über den Barrierefreiheit-Knopf (Symbol daneben) lassen sich Sprache, hoher Kontrast und eine Sprachausgabe der Lage einstellen.</li>
+			</ul>
+
+			<h3 class="help-heading" data-i18n="helpNotesHeading">Zu beachten</h3>
+			<ul class="help-list help-list-notes">
+				<li data-i18n="helpNotes1">Dieses Dashboard ist ein Lernprojekt (Berufsschule) und keine offizielle Software des Katastrophenschutzes Berlin.</li>
+				<li data-i18n="helpNotes2">Die Gefahrenkarte ist eine statische amtliche Karte — sie zeigt keine Live-Daten zu einem laufenden Einsatz.</li>
+				<li data-i18n="helpNotes3">Alle Daten stammen von Drittquellen (siehe unten) und werden ungeprüft weitergegeben — im Ernstfall zusätzlich offizielle Kanäle prüfen (z. B. die NINA-App, Sirenen, Rundfunk).</li>
+			</ul>
+			<p class="help-emergency" data-i18n="helpEmergency">Dieses Dashboard ersetzt keine amtliche Warnung und keinen Notruf. Im Notfall: 112.</p>
+
+			<h3 class="help-heading" data-i18n="helpSourcesHeading">Datenquellen</h3>
+			<ul class="help-sources">
+				<li><strong data-i18n="helpSrc1Label">Wetter, Luftqualität</strong> — <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></li>
+				<li><strong data-i18n="pegelLabel">Pegel Spree · Köpenick</strong> — <a href="https://www.pegelonline.wsv.de" target="_blank" rel="noopener">PEGELONLINE (WSV)</a></li>
+				<li><strong data-i18n="helpSrc3Label">Brände, Gesamteinsätze, Reaktionszeit</strong> — <a href="https://github.com/Berliner-Feuerwehr/BF-Open-Data" target="_blank" rel="noopener">Berliner Feuerwehr – Open Data</a></li>
+				<li><strong data-i18n="helpSrc4Label">Amtliche Warnungen</strong> — <a href="https://warnung.bund.de" target="_blank" rel="noopener">NINA / BBK</a></li>
+				<li><strong data-i18n="hazardLabel">Gefahrenkarte</strong> — <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a></li>
+			</ul>
 		</div>
 	</div>
 
@@ -522,7 +563,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			gap: 12px;
 		}
 
-		.a11y-open {
+		.icon-btn {
 			width: 32px;
 			height: 32px;
 			border-radius: 999px;
@@ -537,8 +578,8 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			transition: color 0.15s ease, transform 0.15s ease;
 		}
 
-		.a11y-open:hover,
-		.a11y-open:focus-visible {
+		.icon-btn:hover,
+		.icon-btn:focus-visible {
 			color: var(--series-pegel);
 			transform: translateY(-1px);
 			outline: none;
@@ -1377,6 +1418,72 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		.a11y-speak-btn:disabled {
 			opacity: 0.5;
 			cursor: not-allowed;
+		}
+
+		/* ---------- Kurzanleitung & Quellen ---------- */
+
+		.help-panel-box {
+			width: min(560px, 100%);
+		}
+
+		.help-panel-box h2 {
+			font-size: 17px;
+			font-weight: 800;
+			margin-bottom: 4px;
+			padding-right: 30px;
+		}
+
+		.help-heading {
+			font-size: 12px;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			color: var(--muted);
+			margin: 18px 0 8px;
+		}
+
+		.help-heading:first-of-type {
+			margin-top: 16px;
+		}
+
+		.help-list {
+			margin: 0;
+			padding-left: 18px;
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			font-size: 13.5px;
+			color: var(--text);
+			line-height: 1.5;
+		}
+
+		.help-emergency {
+			margin-top: 10px;
+			padding: 10px 14px;
+			border-radius: 12px;
+			background: color-mix(in srgb, var(--status-critical) 14%, transparent);
+			color: var(--status-critical);
+			font-weight: 700;
+			font-size: 13.5px;
+		}
+
+		.help-sources {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			font-size: 13px;
+			color: var(--muted);
+		}
+
+		.help-sources strong {
+			font-weight: 700;
+			color: var(--text);
+		}
+
+		.help-sources a {
+			color: var(--series-pegel);
 		}
 
 		/* ---------- Responsive: Tablet ---------- */

@@ -221,6 +221,110 @@ export const STRINGS = {
     pl: "Odczytywanie na głos nie jest wspierane przez tę przeglądarkę.",
     es: "La lectura en voz alta no es compatible con este navegador.",
   },
+
+  helpBtnAria: {
+    de: "Kurzanleitung & Quellen öffnen", en: "Open quick guide & sources",
+    fr: "Ouvrir le guide rapide et les sources", pl: "Otwórz krótki przewodnik i źródła",
+    es: "Abrir guía rápida y fuentes",
+  },
+  helpTitle: {
+    de: "Kurzanleitung & Quellen", en: "Quick Guide & Sources", fr: "Guide rapide et sources",
+    pl: "Krótki przewodnik i źródła", es: "Guía rápida y fuentes",
+  },
+  helpUsageHeading: {
+    de: "So funktioniert das Dashboard", en: "How this dashboard works",
+    fr: "Comment fonctionne ce tableau de bord", pl: "Jak działa ten panel",
+    es: "Cómo funciona este panel",
+  },
+  helpUsage1: {
+    de: "Die Kacheln zeigen den aktuellen Stand automatisch an — nichts muss angeklickt werden, um Werte zu sehen.",
+    en: "The tiles show the current status automatically — nothing needs to be clicked to see values.",
+    fr: "Les tuiles affichent automatiquement l'état actuel — il n'est pas nécessaire de cliquer pour voir les valeurs.",
+    pl: "Kafelki automatycznie pokazują aktualny stan — nie trzeba niczego klikać, aby zobaczyć wartości.",
+    es: "Los paneles muestran el estado actual automáticamente — no es necesario hacer clic para ver los valores.",
+  },
+  helpUsage2: {
+    de: "„Warnungen“, „Gefahrenkarte“ und jeder Tag in der 7-Tage-Vorhersage sind anklickbar und öffnen weitere Details.",
+    en: "“Warnings”, “Hazard map” and each day in the 7-day forecast are clickable and open further details.",
+    fr: "« Alertes », « Carte des risques » et chaque jour de la prévision à 7 jours sont cliquables et ouvrent plus de détails.",
+    pl: "„Ostrzeżenia”, „Mapa zagrożeń” oraz każdy dzień w prognozie 7-dniowej są klikalne i otwierają dalsze szczegóły.",
+    es: "«Avisos», «Mapa de riesgos» y cada día de la previsión a 7 días se pueden pulsar para ver más detalles.",
+  },
+  helpUsage3: {
+    de: "Wetter, Pegel, Brände und Luftqualität aktualisieren sich automatisch alle 5 Minuten, die Uhrzeit jede Sekunde — ein Neuladen der Seite ist dafür nicht nötig.",
+    en: "Weather, water level, fires and air quality update automatically every 5 minutes, the clock every second — no page reload is needed for this.",
+    fr: "La météo, le niveau d'eau, les incendies et la qualité de l'air se mettent à jour automatiquement toutes les 5 minutes, l'heure chaque seconde — aucun rechargement de la page n'est nécessaire.",
+    pl: "Pogoda, poziom wody, pożary i jakość powietrza aktualizują się automatycznie co 5 minut, godzina co sekundę — nie trzeba do tego odświeżać strony.",
+    es: "El tiempo, el nivel del agua, los incendios y la calidad del aire se actualizan automáticamente cada 5 minutos, la hora cada segundo — no es necesario recargar la página.",
+  },
+  helpUsage4: {
+    de: "Amtliche Warnungen werden beim Bauen der Seite geladen und können bis zu 30 Minuten alt sein; bei einem lange geöffneten Tab hilft ein Neuladen der Seite.",
+    en: "Official warnings are loaded when the page is built and can be up to 30 minutes old; if a tab has been open for a while, reloading the page helps.",
+    fr: "Les alertes officielles sont chargées lors de la génération de la page et peuvent avoir jusqu'à 30 minutes de retard ; si un onglet est ouvert depuis longtemps, il est utile de recharger la page.",
+    pl: "Oficjalne ostrzeżenia są wczytywane podczas budowania strony i mogą być nieaktualne o maksymalnie 30 minut; jeśli karta jest otwarta od dłuższego czasu, warto odświeżyć stronę.",
+    es: "Los avisos oficiales se cargan al generar la página y pueden tener hasta 30 minutos de antigüedad; si una pestaña lleva mucho tiempo abierta, conviene recargar la página.",
+  },
+  helpUsage5: {
+    de: "Auf einem Leitstellen-Monitor passt alles ohne Scrollen auf einen Bildschirm; auf Tablet/Smartphone lässt sich die Seite normal scrollen.",
+    en: "On a control-room monitor everything fits on one screen without scrolling; on tablet/smartphone the page scrolls normally.",
+    fr: "Sur un moniteur de salle de contrôle, tout s'affiche sur un seul écran sans défilement ; sur tablette/smartphone, la page défile normalement.",
+    pl: "Na monitorze centrum dowodzenia wszystko mieści się na jednym ekranie bez przewijania; na tablecie/smartfonie strona przewija się normalnie.",
+    es: "En un monitor de sala de control todo cabe en una pantalla sin desplazamiento; en tableta/smartphone la página se desplaza con normalidad.",
+  },
+  helpUsage6: {
+    de: "Über den Barrierefreiheit-Knopf (Symbol daneben) lassen sich Sprache, hoher Kontrast und eine Sprachausgabe der Lage einstellen.",
+    en: "The accessibility button (icon next to it) lets you set language, high contrast and a spoken summary of the situation.",
+    fr: "Le bouton d'accessibilité (icône à côté) permet de régler la langue, le contraste élevé et une lecture à voix haute de la situation.",
+    pl: "Przycisk dostępności (ikona obok) pozwala ustawić język, wysoki kontrast i odczytanie sytuacji na głos.",
+    es: "El botón de accesibilidad (icono junto a este) permite ajustar el idioma, el alto contraste y una lectura en voz alta de la situación.",
+  },
+  helpNotesHeading: {
+    de: "Zu beachten", en: "Important to know", fr: "À noter", pl: "Warto wiedzieć", es: "A tener en cuenta",
+  },
+  helpNotes1: {
+    de: "Dieses Dashboard ist ein Lernprojekt (Berufsschule) und keine offizielle Software des Katastrophenschutzes Berlin.",
+    en: "This dashboard is a school project (vocational training) and not official software of Berlin's civil protection authority.",
+    fr: "Ce tableau de bord est un projet scolaire (formation professionnelle) et non un logiciel officiel de la protection civile de Berlin.",
+    pl: "Ten panel jest projektem szkolnym (szkoła zawodowa) i nie jest oficjalnym oprogramowaniem ochrony ludności Berlina.",
+    es: "Este panel es un proyecto escolar (formación profesional) y no es software oficial de la protección civil de Berlín.",
+  },
+  helpNotes2: {
+    de: "Die Gefahrenkarte ist eine statische amtliche Karte — sie zeigt keine Live-Daten zu einem laufenden Einsatz.",
+    en: "The hazard map is a static official map — it does not show live data for an ongoing incident.",
+    fr: "La carte des risques est une carte officielle statique — elle ne montre pas de données en temps réel sur une intervention en cours.",
+    pl: "Mapa zagrożeń jest statyczną urzędową mapą — nie pokazuje danych na żywo o trwającym zdarzeniu.",
+    es: "El mapa de riesgos es un mapa oficial estático — no muestra datos en vivo sobre una emergencia en curso.",
+  },
+  helpNotes3: {
+    de: "Alle Daten stammen von Drittquellen (siehe unten) und werden ungeprüft weitergegeben — im Ernstfall zusätzlich offizielle Kanäle prüfen (z. B. die NINA-App, Sirenen, Rundfunk).",
+    en: "All data comes from third-party sources (see below) and is passed on unverified — in an actual emergency, also check official channels (e.g. the NINA app, sirens, radio).",
+    fr: "Toutes les données proviennent de sources tierces (voir ci-dessous) et sont transmises sans vérification — en cas d'urgence réelle, consultez également les canaux officiels (par ex. l'application NINA, les sirènes, la radio).",
+    pl: "Wszystkie dane pochodzą ze źródeł zewnętrznych (patrz poniżej) i są przekazywane bez weryfikacji — w razie realnego zagrożenia sprawdź dodatkowo oficjalne kanały (np. aplikację NINA, syreny, radio).",
+    es: "Todos los datos provienen de fuentes externas (ver abajo) y se transmiten sin verificar — en una emergencia real, consulta también los canales oficiales (p. ej. la app NINA, sirenas, radio).",
+  },
+  helpEmergency: {
+    de: "Dieses Dashboard ersetzt keine amtliche Warnung und keinen Notruf. Im Notfall: 112.",
+    en: "This dashboard does not replace an official warning or an emergency call. In an emergency: 112.",
+    fr: "Ce tableau de bord ne remplace ni une alerte officielle ni un appel d'urgence. En cas d'urgence : 112.",
+    pl: "Ten panel nie zastępuje oficjalnego ostrzeżenia ani wezwania pomocy. W razie nagłego wypadku: 112.",
+    es: "Este panel no sustituye a un aviso oficial ni a una llamada de emergencia. En caso de emergencia: 112.",
+  },
+  helpSourcesHeading: {
+    de: "Datenquellen", en: "Data sources", fr: "Sources des données", pl: "Źródła danych", es: "Fuentes de datos",
+  },
+  helpSrc1Label: {
+    de: "Wetter, Luftqualität", en: "Weather, air quality", fr: "Météo, qualité de l'air",
+    pl: "Pogoda, jakość powietrza", es: "Tiempo, calidad del aire",
+  },
+  helpSrc3Label: {
+    de: "Brände, Gesamteinsätze, Reaktionszeit", en: "Fires, total call-outs, response time",
+    fr: "Incendies, interventions totales, temps de réaction", pl: "Pożary, wszystkie interwencje, czas reakcji",
+    es: "Incendios, intervenciones totales, tiempo de respuesta",
+  },
+  helpSrc4Label: {
+    de: "Amtliche Warnungen", en: "Official warnings", fr: "Alertes officielles", pl: "Oficjalne ostrzeżenia",
+    es: "Avisos oficiales",
+  },
 };
 
 export const WEEKDAYS = {

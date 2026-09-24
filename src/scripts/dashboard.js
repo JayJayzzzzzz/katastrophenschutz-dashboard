@@ -852,11 +852,13 @@ function renderDynamicTexts() {
   redrawAllCharts();
 }
 
-function setupA11yPanel() {
-  const openBtn = $("a11yOpen");
-  const panel = $("a11yPanel");
-  const backdrop = $("a11yPanelBackdrop");
-  const closeBtn = $("a11yPanelClose");
+// Simples Öffnen/Schließen-Panel ohne dynamischen Inhalt (Backdrop-Klick,
+// Schließen-Knopf, Escape) — von Hilfe- und Barrierefreiheit-Panel geteilt.
+function setupSimplePanel(openId, panelId, backdropId, closeId) {
+  const openBtn = $(openId);
+  const panel = $(panelId);
+  const backdrop = $(backdropId);
+  const closeBtn = $(closeId);
 
   const open = () => {
     if (!panel) return;
@@ -875,6 +877,10 @@ function setupA11yPanel() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && panel && !panel.hidden) close();
   });
+}
+
+function setupA11yPanel() {
+  setupSimplePanel("a11yOpen", "a11yPanel", "a11yPanelBackdrop", "a11yPanelClose");
 
   document.querySelectorAll(".lang-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -976,6 +982,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 setupA11yPanel();
+setupSimplePanel("helpOpen", "helpPanel", "helpPanelBackdrop", "helpPanelClose");
 
 window.addEventListener("resize", debounce(redrawAllCharts, 150));
 

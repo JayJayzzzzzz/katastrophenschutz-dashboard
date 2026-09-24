@@ -56,6 +56,17 @@ Ein Knopf oben rechts (Icon neben der Uhrzeit) öffnet ein Einstellungs-Panel mi
   komplett im Browser, ohne weiteren Dienst; wird automatisch deaktiviert,
   wenn der Browser die API nicht unterstützt.
 
+## Kurzanleitung & Quellen (in der Seite)
+
+Ein zweiter Knopf oben rechts (Info-Symbol, neben dem Barrierefreiheit-
+Knopf) öffnet ein Panel mit einer kurzen Bedienungsanleitung für die
+(fiktiven) Nutzer:innen beim Katastrophenschutz: was automatisch aktuell
+bleibt, was anklickbar ist, wie alt die Warnungen im schlimmsten Fall sein
+können, und was zu beachten ist (Lernprojekt statt offizieller Software,
+Gefahrenkarte ist statisch, Daten kommen ungeprüft von Drittquellen, im
+Notfall 112). Am Ende steht dieselbe Datenquellen-Tabelle wie unten, jeweils
+mit Link — auch das komplett in allen fünf Sprachen.
+
 ## Datenquellen
 
 | Daten | Quelle | Besonderheit |
