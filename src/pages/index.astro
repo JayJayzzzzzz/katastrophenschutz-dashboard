@@ -9,7 +9,7 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 	<meta name="generator" content={Astro.generator} />
-	<meta name="description" content="Lagebild-Dashboard des Katastrophenschutz Berlin: Wetter, Pegelstand der Spree, Brandeinsätze und 7-Tage-Vorhersage auf einen Blick." />
+	<meta name="description" content="Lagebild-Dashboard des Katastrophenschutz Berlin: Wetter, Pegelstand der Spree, Brandeinsätze, Luftqualität und 7-Tage-Vorhersage auf einen Blick." />
 	<link rel="icon" href={`${import.meta.env.BASE_URL}favicon.svg`} type="image/svg+xml" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -33,6 +33,9 @@
 			<symbol id="i-snow" viewBox="0 0 24 24"><path d="M6.5 13h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 13z"/><path d="M8 17v5M6 18.5l4 2M10 18.5l-4 2M16 17v5M14 18.5l4 2M18 18.5l-4 2"/></symbol>
 			<symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 9.5h11a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 6 3.6"/><path d="M3 13.5h18M3 17h18M3 20.5h13"/></symbol>
 			<symbol id="i-thunder" viewBox="0 0 24 24"><path d="M6.5 12h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 12z"/><path d="m13 12-3 5h3l-2 5 6-7h-3z"/></symbol>
+			<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6l7-3z"/><path d="M9 12l2 2 4-4"/></symbol>
+			<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+			<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 		</defs>
 	</svg>
 
@@ -59,7 +62,9 @@
 				</div>
 				<div class="chips">
 					<span class="chip"><svg class="ic sm"><use href="#i-wind"/></svg><span id="chipWind">-- km/h</span></span>
+					<span class="chip">Böen <span id="chipGust">-- km/h</span></span>
 					<span class="chip"><svg class="ic sm"><use href="#i-drop"/></svg><span id="chipHumidity">-- %</span></span>
+					<span class="chip">Niederschlag <span id="chipPrecip">-- mm</span></span>
 					<span class="chip">Luftdruck <span id="chipPressure">-- hPa</span></span>
 					<span class="chip">UV <span id="chipUV">--</span></span>
 					<span class="chip"><svg class="ic sm"><use href="#i-sun"/></svg><span id="chipSun">--:-- · --:--</span></span>
@@ -67,17 +72,32 @@
 				<div class="status" id="weatherStatus">Lädt …</div>
 			</section>
 
-			<section class="stat s1" aria-label="Pegelstand Spree Berlin-Köpenick">
+			<section class="stat s-pegel" aria-label="Pegelstand Spree Berlin-Köpenick, 48-Stunden-Verlauf">
 				<div class="k"><svg class="ic"><use href="#i-drop"/></svg>Pegel Spree · Köpenick</div>
 				<div class="v" id="pegelValue">-- cm</div>
 				<div class="sub" id="pegelTrend">Lädt …</div>
+				<div class="mini-chart">
+					<svg id="pegelChart" aria-hidden="true"></svg>
+					<div id="pegelTooltip" class="chart-tooltip" hidden></div>
+				</div>
 				<div class="sub muted" id="pegelTime"></div>
 			</section>
 
-			<section class="stat s2" aria-label="Brandeinsätze der Berliner Feuerwehr">
-				<div class="k"><svg class="ic"><use href="#i-flame"/></svg>Brände (Vortag)</div>
+			<section class="stat s-fire" aria-label="Brandeinsätze der Berliner Feuerwehr, 14-Tage-Verlauf">
+				<div class="k"><svg class="ic"><use href="#i-flame"/></svg>Brände · 14-Tage-Verlauf</div>
 				<div class="v"><span id="fireCount">--</span> <span class="unit">Einsätze</span></div>
 				<div class="sub">am <span id="fireDate">--</span></div>
+				<div class="mini-chart">
+					<svg id="fireChart" aria-hidden="true"></svg>
+					<div id="fireTooltip" class="chart-tooltip" hidden></div>
+				</div>
+			</section>
+
+			<section class="stat s-air" aria-label="Luftqualität (relevant bei Rauchbelastung durch Brände)">
+				<div class="k"><svg class="ic" id="aqiIcon"><use href="#i-shield"/></svg>Luftqualität</div>
+				<div class="v" id="aqiValue">--</div>
+				<div class="sub" id="aqiDetail">Lädt …</div>
+				<div class="sub muted" id="aqiSub"></div>
 			</section>
 
 			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf">
@@ -88,9 +108,37 @@
 				</div>
 			</section>
 
-			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage"></section>
+			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage, zum Aufklappen antippen"></section>
 		</div>
 	</main>
+
+	<div class="day-modal" id="dayModal" hidden>
+		<div class="day-modal-backdrop" id="dayModalBackdrop"></div>
+		<div class="day-modal-panel" role="dialog" aria-modal="true" aria-labelledby="dayModalDate">
+			<button class="day-modal-close" id="dayModalClose" aria-label="Schließen">
+				<svg class="ic"><use href="#i-close"/></svg>
+			</button>
+			<div class="day-modal-head">
+				<svg class="day-modal-icon" id="dayModalIcon"><use href="#i-cloud"/></svg>
+				<div>
+					<div class="day-modal-date" id="dayModalDate">–</div>
+					<div class="day-modal-cond" id="dayModalCond">–</div>
+				</div>
+			</div>
+			<div class="day-modal-temps">
+				<span class="hi"><svg class="ic"><use href="#i-up"/></svg><span id="dayModalHi">--°</span></span>
+				<span class="lo"><svg class="ic"><use href="#i-down"/></svg><span id="dayModalLo">--°</span></span>
+			</div>
+			<div class="day-modal-grid">
+				<div class="dm-stat"><div class="dm-k">Niederschlag</div><div class="dm-v" id="dayModalPrecip">--</div></div>
+				<div class="dm-stat"><div class="dm-k">Regenwahrscheinlichkeit</div><div class="dm-v" id="dayModalPrecipProb">--</div></div>
+				<div class="dm-stat"><div class="dm-k">Wind (max.)</div><div class="dm-v" id="dayModalWind">--</div></div>
+				<div class="dm-stat"><div class="dm-k">Böen (max.)</div><div class="dm-v" id="dayModalGust">--</div></div>
+				<div class="dm-stat"><div class="dm-k">UV-Index (max.)</div><div class="dm-v" id="dayModalUV">--</div></div>
+				<div class="dm-stat"><div class="dm-k">Sonnenauf-/-untergang</div><div class="dm-v" id="dayModalSun">--</div></div>
+			</div>
+		</div>
+	</div>
 
 	<script>
 		import "../scripts/dashboard.js";
@@ -103,11 +151,17 @@
 			--panel-2: #232a32;
 			--text: #dfe6ec;
 			--muted: #8a97a3;
-			--accent: #6fb8ac;
-			--accent2: #c98a5a;
-			--chart-grid: rgba(255, 255, 255, 0.06);
-			--radius: 22px;
-			--shadow-out: 10px 10px 20px rgba(0, 0, 0, 0.5), -8px -8px 18px rgba(255, 255, 255, 0.025);
+			--accent: #22a67e;
+			--series-weather: #22a67e;
+			--series-pegel: #3987e5;
+			--series-fire: #d95926;
+			--status-good: #0ca30c;
+			--status-warning: #fab219;
+			--status-serious: #ec835a;
+			--status-critical: #d03b3b;
+			--chart-grid: rgba(255, 255, 255, 0.07);
+			--radius: 20px;
+			--shadow-out: 9px 9px 18px rgba(0, 0, 0, 0.5), -7px -7px 16px rgba(255, 255, 255, 0.025);
 			--shadow-in: inset 4px 4px 10px rgba(0, 0, 0, 0.4), inset -3px -3px 8px rgba(255, 255, 255, 0.02);
 		}
 
@@ -125,23 +179,27 @@
 			font-family: "Nunito Sans", "Segoe UI", sans-serif;
 		}
 
+		body.modal-open {
+			overflow: hidden;
+		}
+
 		.screen {
 			height: 100dvh;
 			width: 100%;
-			padding: 22px 28px;
+			padding: 18px 24px;
 		}
 
 		.layout {
 			height: 100%;
 			display: grid;
-			grid-template-columns: 1.35fr 1fr 1fr;
-			grid-template-rows: auto 1.2fr 1fr auto;
+			grid-template-columns: 1.3fr 1fr 1fr 0.95fr;
+			grid-template-rows: auto 1.25fr 0.72fr auto;
 			grid-template-areas:
-				"top top top"
-				"hero stat1 stat2"
-				"chart chart chart"
-				"forecast forecast forecast";
-			gap: 18px;
+				"top top top top"
+				"hero pegel fire air"
+				"chart chart chart chart"
+				"forecast forecast forecast forecast";
+			gap: 14px;
 		}
 
 		.ic {
@@ -172,7 +230,7 @@
 			align-items: center;
 			gap: 9px;
 			font-weight: 700;
-			font-size: 20px;
+			font-size: 19px;
 			color: var(--accent);
 		}
 
@@ -181,7 +239,7 @@
 			align-items: center;
 			gap: 8px;
 			color: var(--muted);
-			font-size: 15px;
+			font-size: 14.5px;
 			font-variant-numeric: tabular-nums;
 		}
 
@@ -190,21 +248,26 @@
 			height: 7px;
 			border-radius: 50%;
 			background: var(--accent);
-			box-shadow: 0 0 0 3px rgba(111, 184, 172, 0.25);
+			box-shadow: 0 0 0 3px rgba(34, 166, 126, 0.25);
+		}
+
+		.hero-block,
+		.stat,
+		.chart-box {
+			background: var(--panel);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow-out);
+			min-height: 0;
+			overflow: hidden;
 		}
 
 		.hero-block {
 			grid-area: hero;
-			background: var(--panel);
-			border-radius: var(--radius);
-			box-shadow: var(--shadow-out);
-			padding: 22px 26px;
+			padding: 18px 22px;
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
-			gap: 8px;
-			min-height: 0;
-			overflow: hidden;
+			gap: 7px;
 		}
 
 		.hero-top {
@@ -215,15 +278,15 @@
 
 		.temp-big {
 			font-weight: 800;
-			font-size: clamp(2.6rem, 5vw, 4.6rem);
+			font-size: clamp(2.2rem, 4vw, 3.6rem);
 			line-height: 1;
 			letter-spacing: -0.02em;
 		}
 
 		.hero-icon {
-			width: 64px;
-			height: 64px;
-			color: var(--accent);
+			width: 52px;
+			height: 52px;
+			color: var(--series-weather);
 			fill: none;
 			stroke: currentColor;
 			stroke-width: 1.6;
@@ -232,7 +295,7 @@
 		}
 
 		.cond {
-			font-size: 18px;
+			font-size: 16.5px;
 			color: var(--muted);
 		}
 
@@ -240,7 +303,7 @@
 			display: flex;
 			align-items: center;
 			gap: 8px;
-			font-size: 14.5px;
+			font-size: 14px;
 			color: var(--muted);
 			font-variant-numeric: tabular-nums;
 		}
@@ -248,8 +311,8 @@
 		.chips {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 8px;
-			margin-top: 6px;
+			gap: 7px;
+			margin-top: 4px;
 		}
 
 		.chip {
@@ -259,57 +322,59 @@
 			background: var(--bg);
 			box-shadow: var(--shadow-in);
 			border-radius: 999px;
-			padding: 6px 12px;
-			font-size: 12.5px;
+			padding: 5px 11px;
+			font-size: 12px;
 			color: var(--muted);
 			font-variant-numeric: tabular-nums;
 		}
 
 		.status {
 			margin-top: auto;
-			font-size: 11.5px;
+			font-size: 11px;
 			color: var(--muted);
 			opacity: 0.75;
 		}
 
 		.stat {
-			background: var(--panel);
-			border-radius: var(--radius);
-			box-shadow: var(--shadow-out);
-			padding: 18px 22px;
+			padding: 14px 18px;
 			display: flex;
 			flex-direction: column;
+			gap: 4px;
+		}
+
+		.stat.s-pegel {
+			grid-area: pegel;
+			--icon-color: var(--series-pegel);
+		}
+
+		.stat.s-fire {
+			grid-area: fire;
+			--icon-color: var(--series-fire);
+		}
+
+		.stat.s-air {
+			grid-area: air;
 			justify-content: center;
 			gap: 6px;
-			min-height: 0;
-			overflow: hidden;
-		}
-
-		.stat.s1 {
-			grid-area: stat1;
-		}
-
-		.stat.s2 {
-			grid-area: stat2;
 		}
 
 		.stat .k {
 			display: flex;
 			align-items: center;
 			gap: 7px;
-			font-size: 12px;
-			letter-spacing: 0.04em;
+			font-size: 11.5px;
+			letter-spacing: 0.03em;
 			text-transform: uppercase;
 			color: var(--muted);
 		}
 
 		.stat .k .ic {
-			color: var(--accent);
+			color: var(--icon-color, var(--accent));
 		}
 
 		.stat .v {
 			font-weight: 800;
-			font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+			font-size: clamp(1.3rem, 2vw, 1.7rem);
 			font-variant-numeric: tabular-nums;
 		}
 
@@ -323,32 +388,66 @@
 		}
 
 		.stat .sub {
-			font-size: 13px;
+			font-size: 12.5px;
 			color: var(--muted);
 		}
 
 		.stat .sub.muted {
 			opacity: 0.65;
-			font-size: 11.5px;
+			font-size: 11px;
+		}
+
+		.mini-chart {
+			position: relative;
+			flex: 1;
+			min-height: 42px;
+			margin: 2px 0;
+		}
+
+		.mini-chart svg {
+			width: 100%;
+			height: 100%;
+			display: block;
+		}
+
+		.v.aqi-good {
+			color: var(--status-good);
+		}
+		.v.aqi-warning {
+			color: var(--status-warning);
+		}
+		.v.aqi-serious {
+			color: var(--status-serious);
+		}
+		.v.aqi-critical {
+			color: var(--status-critical);
+		}
+		.ic.aqi-good {
+			color: var(--status-good);
+		}
+		.ic.aqi-warning {
+			color: var(--status-warning);
+		}
+		.ic.aqi-serious {
+			color: var(--status-serious);
+		}
+		.ic.aqi-critical {
+			color: var(--status-critical);
 		}
 
 		.chart-box {
 			grid-area: chart;
-			background: var(--panel);
-			border-radius: var(--radius);
-			box-shadow: var(--shadow-out);
-			padding: 16px 20px;
+			padding: 10px 18px 8px;
 			display: flex;
 			flex-direction: column;
-			min-height: 0;
 		}
 
 		.chart-head {
 			display: flex;
 			justify-content: space-between;
-			font-size: 12.5px;
+			font-size: 12px;
 			color: var(--muted);
-			margin-bottom: 6px;
+			margin-bottom: 4px;
 			flex-shrink: 0;
 		}
 
@@ -379,7 +478,7 @@
 			color: var(--text);
 			padding: 6px 10px;
 			border-radius: 10px;
-			font-size: 12.5px;
+			font-size: 12px;
 			white-space: nowrap;
 			font-variant-numeric: tabular-nums;
 			z-index: 2;
@@ -398,64 +497,283 @@
 
 		.forecast :global(.day) {
 			background: var(--panel);
+			border: none;
 			border-radius: 16px;
 			box-shadow: var(--shadow-out);
-			padding: 10px 6px 12px;
+			padding: 9px 4px 8px;
 			text-align: center;
+			color: var(--text);
+			font: inherit;
+			cursor: pointer;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			transition: box-shadow 0.15s ease, transform 0.15s ease;
+		}
+
+		.forecast :global(.day:hover),
+		.forecast :global(.day:focus-visible) {
+			transform: translateY(-2px);
+			box-shadow: var(--shadow-out), 0 0 0 2px var(--series-weather);
+			outline: none;
 		}
 
 		.forecast :global(.d) {
-			font-size: 12.5px;
+			font-size: 12px;
 			font-weight: 700;
 			color: var(--muted);
-			margin-bottom: 6px;
+			margin-bottom: 5px;
 		}
 
 		.forecast :global(.ic) {
-			width: 24px;
-			height: 24px;
-			color: var(--accent);
-			margin: 0 auto 6px;
+			width: 22px;
+			height: 22px;
+			color: var(--series-weather);
+			margin: 0 auto 5px;
 			display: block;
 		}
 
 		.forecast :global(.hi) {
 			font-weight: 800;
-			font-size: 15px;
+			font-size: 14px;
 			font-variant-numeric: tabular-nums;
 		}
 
 		.forecast :global(.lo) {
-			font-size: 12.5px;
+			font-size: 12px;
 			color: var(--muted);
 			font-variant-numeric: tabular-nums;
 		}
 
-		@media (max-width: 900px) {
+		.forecast :global(.chev) {
+			width: 13px;
+			height: 13px;
+			color: var(--muted);
+			opacity: 0.6;
+			margin-top: 4px;
+		}
+
+		/* ---------- Tages-Detail (Fokus-Ansicht der 7-Tage-Vorhersage) ---------- */
+
+		.day-modal {
+			position: fixed;
+			inset: 0;
+			z-index: 50;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+		}
+
+		.day-modal[hidden] {
+			display: none;
+		}
+
+		.day-modal-backdrop {
+			position: absolute;
+			inset: 0;
+			background: rgba(4, 8, 10, 0.6);
+			backdrop-filter: blur(3px);
+		}
+
+		.day-modal-panel {
+			position: relative;
+			z-index: 1;
+			width: min(440px, 100%);
+			max-height: 90vh;
+			overflow: auto;
+			background: var(--panel);
+			border-radius: 24px;
+			box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+			padding: 26px 24px 22px;
+		}
+
+		.day-modal-close {
+			position: absolute;
+			top: 14px;
+			right: 14px;
+			width: 34px;
+			height: 34px;
+			border-radius: 999px;
+			border: none;
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			color: var(--text);
+			cursor: pointer;
+			display: grid;
+			place-items: center;
+		}
+
+		.day-modal-head {
+			display: flex;
+			align-items: center;
+			gap: 14px;
+			margin-bottom: 10px;
+		}
+
+		.day-modal-icon {
+			width: 46px;
+			height: 46px;
+			color: var(--series-weather);
+			flex-shrink: 0;
+		}
+
+		.day-modal-date {
+			font-weight: 800;
+			font-size: 16.5px;
+		}
+
+		.day-modal-cond {
+			color: var(--muted);
+			font-size: 13.5px;
+		}
+
+		.day-modal-temps {
+			display: flex;
+			gap: 16px;
+			font-size: 22px;
+			font-weight: 800;
+			margin: 12px 0 18px;
+			font-variant-numeric: tabular-nums;
+		}
+
+		.day-modal-temps .hi,
+		.day-modal-temps .lo {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.day-modal-temps .lo {
+			color: var(--muted);
+			font-weight: 700;
+		}
+
+		.day-modal-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 10px;
+		}
+
+		.dm-stat {
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			border-radius: 14px;
+			padding: 10px 12px;
+		}
+
+		.dm-k {
+			font-size: 11px;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			color: var(--muted);
+			margin-bottom: 4px;
+		}
+
+		.dm-v {
+			font-weight: 800;
+			font-size: 15px;
+			font-variant-numeric: tabular-nums;
+		}
+
+		/* ---------- Responsive: Tablet ---------- */
+
+		@media (max-width: 1100px) {
+			html,
+			body {
+				height: auto;
+				overflow: visible;
+			}
+
 			.screen {
-				padding: 14px 16px;
+				height: auto;
+				min-height: 100dvh;
+				padding: 16px 18px 26px;
 			}
 
 			.layout {
+				height: auto;
 				grid-template-columns: 1fr 1fr;
-				grid-template-rows: auto auto auto 1fr auto;
+				grid-template-rows: none;
 				grid-template-areas:
 					"top top"
 					"hero hero"
-					"stat1 stat2"
+					"pegel fire"
+					"air air"
 					"chart chart"
 					"forecast forecast";
 				gap: 12px;
 			}
 
-			.forecast {
-				grid-template-columns: repeat(4, 1fr);
-				grid-template-rows: repeat(2, 1fr);
-				overflow: hidden;
+			.mini-chart {
+				flex: none;
+				height: 110px;
 			}
 
-			.forecast :global(.day:nth-child(n + 5)) {
-				display: none;
+			.chart-box {
+				height: 220px;
+				padding: 14px 18px 10px;
+			}
+
+			.forecast {
+				grid-template-columns: repeat(4, 1fr);
+				gap: 10px;
+			}
+		}
+
+		/* ---------- Responsive: Smartphone ---------- */
+
+		@media (max-width: 640px) {
+			.screen {
+				padding: 12px 14px 22px;
+			}
+
+			.layout {
+				grid-template-columns: 1fr;
+				grid-template-areas:
+					"top"
+					"hero"
+					"pegel"
+					"fire"
+					"air"
+					"chart"
+					"forecast";
+				gap: 10px;
+			}
+
+			.area-top {
+				flex-wrap: wrap;
+				gap: 6px;
+				row-gap: 4px;
+			}
+
+			.place {
+				font-size: 17px;
+			}
+
+			.timestamp {
+				font-size: 12.5px;
+				flex-wrap: wrap;
+			}
+
+			.temp-big {
+				font-size: 2.6rem;
+			}
+
+			.mini-chart {
+				height: 90px;
+			}
+
+			.chart-box {
+				height: 190px;
+			}
+
+			.forecast {
+				grid-template-columns: repeat(3, 1fr);
+			}
+
+			.day-modal-grid {
+				grid-template-columns: 1fr;
 			}
 		}
 	</style>
