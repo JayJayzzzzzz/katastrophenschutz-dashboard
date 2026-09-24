@@ -1,0 +1,463 @@
+---
+// Katastrophenschutz Berlin — Lagebild-Dashboard
+// Statische Astro-Seite; alle Live-Daten werden im Browser nachgeladen
+// (siehe src/scripts/dashboard.js) — passt zu einem reinen GitHub-Pages-Hosting.
+---
+
+<html lang="de">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<meta name="generator" content={Astro.generator} />
+	<meta name="description" content="Lagebild-Dashboard des Katastrophenschutz Berlin: Wetter, Pegelstand der Spree, Brandeinsätze und 7-Tage-Vorhersage auf einen Blick." />
+	<link rel="icon" href={`${import.meta.env.BASE_URL}favicon.svg`} type="image/svg+xml" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap" />
+	<title>Lagebild-Dashboard · Katastrophenschutz Berlin</title>
+</head>
+<body>
+	<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+		<defs>
+			<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.6 7-12a7 7 0 1 0-14 0c0 5.4 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></symbol>
+			<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+			<symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6.5 7 6.5 11.5A6.5 6.5 0 1 1 5.5 14.5C5.5 10 12 3 12 3z"/></symbol>
+			<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.5c1 3-3 4.3-3 7.6a3 3 0 0 0 6 0c0-1.1-.9-1.6-.9-2.7 1.6 1.1 3.4 3.3 3.4 6a5.5 5.5 0 1 1-11 0c0-4.6 3.8-7 5.5-10.9z"/></symbol>
+			<symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 8h10.5a2.5 2.5 0 1 0-2.3-3.4"/><path d="M3 12.5h13.5a2.7 2.7 0 1 1-2.4 3.6"/><path d="M3 17h7.5"/></symbol>
+			<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></symbol>
+			<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M18 13l-6 6-6-6"/></symbol>
+			<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.6"/><path d="M12 2.5v2.4M12 19v2.4M4.2 12H1.8M22.2 12h-2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7"/></symbol>
+			<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 18h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 18z"/></symbol>
+			<symbol id="i-cloud-sun" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M8 2.6v1.6M8 12v0M3.4 8H2M13.6 6.5 12.3 7.7M3.7 3.7 5 5"/><path d="M9.5 20h9a3.3 3.3 0 0 0 .4-6.6 4.6 4.6 0 0 0-8.8-1.4A3.3 3.3 0 0 0 9.5 20z"/></symbol>
+			<symbol id="i-rain" viewBox="0 0 24 24"><path d="M6.5 14h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 14z"/><path d="M8 18.5 7 21M12 18.5l-1 2.5M16 18.5l-1 2.5"/></symbol>
+			<symbol id="i-snow" viewBox="0 0 24 24"><path d="M6.5 13h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 13z"/><path d="M8 17v5M6 18.5l4 2M10 18.5l-4 2M16 17v5M14 18.5l4 2M18 18.5l-4 2"/></symbol>
+			<symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 9.5h11a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 6 3.6"/><path d="M3 13.5h18M3 17h18M3 20.5h13"/></symbol>
+			<symbol id="i-thunder" viewBox="0 0 24 24"><path d="M6.5 12h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 12z"/><path d="m13 12-3 5h3l-2 5 6-7h-3z"/></symbol>
+		</defs>
+	</svg>
+
+	<main class="screen">
+		<div class="layout">
+			<div class="area-top">
+				<div class="place"><svg class="ic"><use href="#i-pin"/></svg>Berlin, DE</div>
+				<div class="timestamp">
+					<svg class="ic"><use href="#i-clock"/></svg>
+					<span id="liveDate">–</span> · <span id="liveClock">--:--:--</span> Uhr
+					<span class="live-dot" aria-hidden="true"></span>
+				</div>
+			</div>
+
+			<section class="hero-block" aria-label="Aktuelles Wetter">
+				<div class="hero-top">
+					<div class="temp-big"><span id="temperature">--°</span></div>
+					<svg class="hero-icon" id="heroIcon"><use href="#i-cloud"/></svg>
+				</div>
+				<div class="cond" id="description">Wetter wird geladen …</div>
+				<div class="minmax">
+					<svg class="ic"><use href="#i-down"/></svg><strong id="tempMin">--°</strong>
+					<svg class="ic"><use href="#i-up"/></svg><strong id="tempMax">--°</strong>
+				</div>
+				<div class="chips">
+					<span class="chip"><svg class="ic sm"><use href="#i-wind"/></svg><span id="chipWind">-- km/h</span></span>
+					<span class="chip"><svg class="ic sm"><use href="#i-drop"/></svg><span id="chipHumidity">-- %</span></span>
+					<span class="chip">Luftdruck <span id="chipPressure">-- hPa</span></span>
+					<span class="chip">UV <span id="chipUV">--</span></span>
+					<span class="chip"><svg class="ic sm"><use href="#i-sun"/></svg><span id="chipSun">--:-- · --:--</span></span>
+				</div>
+				<div class="status" id="weatherStatus">Lädt …</div>
+			</section>
+
+			<section class="stat s1" aria-label="Pegelstand Spree Berlin-Köpenick">
+				<div class="k"><svg class="ic"><use href="#i-drop"/></svg>Pegel Spree · Köpenick</div>
+				<div class="v" id="pegelValue">-- cm</div>
+				<div class="sub" id="pegelTrend">Lädt …</div>
+				<div class="sub muted" id="pegelTime"></div>
+			</section>
+
+			<section class="stat s2" aria-label="Brandeinsätze der Berliner Feuerwehr">
+				<div class="k"><svg class="ic"><use href="#i-flame"/></svg>Brände (Vortag)</div>
+				<div class="v"><span id="fireCount">--</span> <span class="unit">Einsätze</span></div>
+				<div class="sub">am <span id="fireDate">--</span></div>
+			</section>
+
+			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf">
+				<div class="chart-head"><span>24-Std.-Verlauf</span><b id="chartNow">--°</b></div>
+				<div class="chart-wrap">
+					<svg id="weatherChart" preserveAspectRatio="none" aria-hidden="true"></svg>
+					<div id="chartTooltip" class="chart-tooltip" hidden></div>
+				</div>
+			</section>
+
+			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage"></section>
+		</div>
+	</main>
+
+	<script>
+		import "../scripts/dashboard.js";
+	</script>
+
+	<style>
+		:root {
+			--bg: #1b2028;
+			--panel: #20262e;
+			--panel-2: #232a32;
+			--text: #dfe6ec;
+			--muted: #8a97a3;
+			--accent: #6fb8ac;
+			--accent2: #c98a5a;
+			--chart-grid: rgba(255, 255, 255, 0.06);
+			--radius: 22px;
+			--shadow-out: 10px 10px 20px rgba(0, 0, 0, 0.5), -8px -8px 18px rgba(255, 255, 255, 0.025);
+			--shadow-in: inset 4px 4px 10px rgba(0, 0, 0, 0.4), inset -3px -3px 8px rgba(255, 255, 255, 0.02);
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+			background: var(--bg);
+			color: var(--text);
+			font-family: "Nunito Sans", "Segoe UI", sans-serif;
+		}
+
+		.screen {
+			height: 100dvh;
+			width: 100%;
+			padding: 22px 28px;
+		}
+
+		.layout {
+			height: 100%;
+			display: grid;
+			grid-template-columns: 1.35fr 1fr 1fr;
+			grid-template-rows: auto 1.2fr 1fr auto;
+			grid-template-areas:
+				"top top top"
+				"hero stat1 stat2"
+				"chart chart chart"
+				"forecast forecast forecast";
+			gap: 18px;
+		}
+
+		.ic {
+			width: 16px;
+			height: 16px;
+			fill: none;
+			stroke: currentColor;
+			stroke-width: 1.8;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+			flex-shrink: 0;
+		}
+
+		.ic.sm {
+			width: 13px;
+			height: 13px;
+		}
+
+		.area-top {
+			grid-area: top;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.place {
+			display: flex;
+			align-items: center;
+			gap: 9px;
+			font-weight: 700;
+			font-size: 20px;
+			color: var(--accent);
+		}
+
+		.timestamp {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			color: var(--muted);
+			font-size: 15px;
+			font-variant-numeric: tabular-nums;
+		}
+
+		.live-dot {
+			width: 7px;
+			height: 7px;
+			border-radius: 50%;
+			background: var(--accent);
+			box-shadow: 0 0 0 3px rgba(111, 184, 172, 0.25);
+		}
+
+		.hero-block {
+			grid-area: hero;
+			background: var(--panel);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow-out);
+			padding: 22px 26px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			gap: 8px;
+			min-height: 0;
+			overflow: hidden;
+		}
+
+		.hero-top {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.temp-big {
+			font-weight: 800;
+			font-size: clamp(2.6rem, 5vw, 4.6rem);
+			line-height: 1;
+			letter-spacing: -0.02em;
+		}
+
+		.hero-icon {
+			width: 64px;
+			height: 64px;
+			color: var(--accent);
+			fill: none;
+			stroke: currentColor;
+			stroke-width: 1.6;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+		}
+
+		.cond {
+			font-size: 18px;
+			color: var(--muted);
+		}
+
+		.minmax {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 14.5px;
+			color: var(--muted);
+			font-variant-numeric: tabular-nums;
+		}
+
+		.chips {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-top: 6px;
+		}
+
+		.chip {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			border-radius: 999px;
+			padding: 6px 12px;
+			font-size: 12.5px;
+			color: var(--muted);
+			font-variant-numeric: tabular-nums;
+		}
+
+		.status {
+			margin-top: auto;
+			font-size: 11.5px;
+			color: var(--muted);
+			opacity: 0.75;
+		}
+
+		.stat {
+			background: var(--panel);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow-out);
+			padding: 18px 22px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			gap: 6px;
+			min-height: 0;
+			overflow: hidden;
+		}
+
+		.stat.s1 {
+			grid-area: stat1;
+		}
+
+		.stat.s2 {
+			grid-area: stat2;
+		}
+
+		.stat .k {
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			font-size: 12px;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+			color: var(--muted);
+		}
+
+		.stat .k .ic {
+			color: var(--accent);
+		}
+
+		.stat .v {
+			font-weight: 800;
+			font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+			font-variant-numeric: tabular-nums;
+		}
+
+		.stat .v .unit {
+			font-size: 0.5em;
+			font-weight: 700;
+			color: var(--muted);
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			margin-left: 4px;
+		}
+
+		.stat .sub {
+			font-size: 13px;
+			color: var(--muted);
+		}
+
+		.stat .sub.muted {
+			opacity: 0.65;
+			font-size: 11.5px;
+		}
+
+		.chart-box {
+			grid-area: chart;
+			background: var(--panel);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow-out);
+			padding: 16px 20px;
+			display: flex;
+			flex-direction: column;
+			min-height: 0;
+		}
+
+		.chart-head {
+			display: flex;
+			justify-content: space-between;
+			font-size: 12.5px;
+			color: var(--muted);
+			margin-bottom: 6px;
+			flex-shrink: 0;
+		}
+
+		.chart-head b {
+			color: var(--text);
+			font-weight: 800;
+			font-variant-numeric: tabular-nums;
+		}
+
+		.chart-wrap {
+			position: relative;
+			flex: 1;
+			min-height: 0;
+		}
+
+		#weatherChart {
+			width: 100%;
+			height: 100%;
+			display: block;
+		}
+
+		.chart-tooltip {
+			position: absolute;
+			pointer-events: none;
+			transform: translate(-50%, -115%);
+			background: var(--bg);
+			box-shadow: var(--shadow-out);
+			color: var(--text);
+			padding: 6px 10px;
+			border-radius: 10px;
+			font-size: 12.5px;
+			white-space: nowrap;
+			font-variant-numeric: tabular-nums;
+			z-index: 2;
+		}
+
+		.chart-tooltip[hidden] {
+			display: none;
+		}
+
+		.forecast {
+			grid-area: forecast;
+			display: grid;
+			grid-template-columns: repeat(7, 1fr);
+			gap: 10px;
+		}
+
+		.forecast :global(.day) {
+			background: var(--panel);
+			border-radius: 16px;
+			box-shadow: var(--shadow-out);
+			padding: 10px 6px 12px;
+			text-align: center;
+		}
+
+		.forecast :global(.d) {
+			font-size: 12.5px;
+			font-weight: 700;
+			color: var(--muted);
+			margin-bottom: 6px;
+		}
+
+		.forecast :global(.ic) {
+			width: 24px;
+			height: 24px;
+			color: var(--accent);
+			margin: 0 auto 6px;
+			display: block;
+		}
+
+		.forecast :global(.hi) {
+			font-weight: 800;
+			font-size: 15px;
+			font-variant-numeric: tabular-nums;
+		}
+
+		.forecast :global(.lo) {
+			font-size: 12.5px;
+			color: var(--muted);
+			font-variant-numeric: tabular-nums;
+		}
+
+		@media (max-width: 900px) {
+			.screen {
+				padding: 14px 16px;
+			}
+
+			.layout {
+				grid-template-columns: 1fr 1fr;
+				grid-template-rows: auto auto auto 1fr auto;
+				grid-template-areas:
+					"top top"
+					"hero hero"
+					"stat1 stat2"
+					"chart chart"
+					"forecast forecast";
+				gap: 12px;
+			}
+
+			.forecast {
+				grid-template-columns: repeat(4, 1fr);
+				grid-template-rows: repeat(2, 1fr);
+				overflow: hidden;
+			}
+
+			.forecast :global(.day:nth-child(n + 5)) {
+				display: none;
+			}
+		}
+	</style>
+</body>
+</html>
