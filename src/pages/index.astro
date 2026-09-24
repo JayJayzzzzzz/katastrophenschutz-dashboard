@@ -152,10 +152,16 @@ const warningsStatus = warningsError
 				</div>
 			</div>
 
-			<section class="hero-block" aria-label="Aktuelles Wetter">
+			<section class="hero-block" aria-label="Aktuelles Wetter und Luftqualität">
 				<div class="hero-top">
 					<div class="temp-big"><span id="temperature">--°</span></div>
-					<svg class="hero-icon" id="heroIcon"><use href="#i-cloud"/></svg>
+					<div class="hero-icon-col">
+						<svg class="hero-icon" id="heroIcon"><use href="#i-cloud"/></svg>
+						<div class="air-badge" title="Luftqualität">
+							<svg class="ic" id="aqiIcon"><use href="#i-shield"/></svg>
+							<span id="aqiValue">--</span>
+						</div>
+					</div>
 				</div>
 				<div class="cond" id="description">Wetter wird geladen …</div>
 				<div class="minmax">
@@ -170,6 +176,7 @@ const warningsStatus = warningsError
 					<span class="chip">Luftdruck <span id="chipPressure">-- hPa</span></span>
 					<span class="chip">UV <span id="chipUV">--</span></span>
 					<span class="chip"><svg class="ic sm"><use href="#i-sun"/></svg><span id="chipSun">--:-- · --:--</span></span>
+					<span class="chip">Luft <span id="aqiDetail">Lädt …</span></span>
 				</div>
 				<div class="status" id="weatherStatus">Lädt …</div>
 			</section>
@@ -195,21 +202,30 @@ const warningsStatus = warningsError
 				</div>
 			</section>
 
-			<div class="stack-col" style="grid-area: air;">
-				<section class="mini-stat" aria-label="Luftqualität (relevant bei Rauchbelastung durch Brände)">
-					<div class="k"><svg class="ic" id="aqiIcon"><use href="#i-shield"/></svg>Luftqualität</div>
-					<div class="v" id="aqiValue">--</div>
-					<div class="sub" id="aqiDetail">Lädt …</div>
-				</section>
+			<button type="button" class="stat s-warn" id="warningsOpen" aria-haspopup="dialog" aria-label="Amtliche Warnungen, Details öffnen">
+				<div class="k"><svg class="ic"><use href="#i-alert"/></svg>Warnungen</div>
+				<div class:list={["v", warningsStatus.cls]}>
+					{warningsError ? "Keine Daten" : warnings.length > 0 ? `${warnings.length} aktiv` : "Keine aktiv"}
+				</div>
+				<div class="sub">{warningsError ? "Bund/DWD für Berlin nicht erreichbar" : "Bund/DWD für Berlin"}</div>
 
-				<button type="button" class="mini-stat mini-stat-btn" id="warningsOpen" aria-haspopup="dialog">
-					<div class="k"><svg class="ic"><use href="#i-alert"/></svg>Warnungen</div>
-					<div class:list={["v", warningsStatus.cls]}>
-						{warningsError ? "Keine Daten" : warnings.length > 0 ? `${warnings.length} aktiv` : "Keine aktiv"}
-					</div>
-					<div class="sub">{warnings.length > 0 ? warnings[0].headline : "Bund/DWD für Berlin"}</div>
-				</button>
-			</div>
+				<div class="warn-preview">
+					{warningsError ? (
+						<p>Warnungen aktuell nicht abrufbar.</p>
+					) : warnings.length === 0 ? (
+						<p>Keine amtlichen Warnungen (NINA/DWD/BBK) für Berlin.</p>
+					) : (
+						warnings.slice(0, 3).map((w) => (
+							<p class="warn-preview-item">
+								<span class:list={["warn-dot", (SEVERITY_STATUS[w.severity] || SEVERITY_STATUS.Minor).cls]}></span>
+								{w.headline}
+							</p>
+						))
+					)}
+				</div>
+
+				<div class="sub muted">Details ansehen</div>
+			</button>
 
 			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf">
 				<div class="chart-head"><span>24-Std.-Verlauf</span><b id="chartNow">--°</b></div>
@@ -358,7 +374,7 @@ const warningsStatus = warningsError
 			grid-template-rows: auto 1.2fr 0.68fr auto;
 			grid-template-areas:
 				"top top top top"
-				"hero pegel fire air"
+				"hero pegel fire warn"
 				"chart chart resptime total"
 				"forecast forecast forecast forecast";
 			gap: 14px;
@@ -528,28 +544,35 @@ const warningsStatus = warningsError
 			padding: 14px 18px;
 		}
 
-		.stack-col {
+		.hero-icon-col {
 			display: flex;
 			flex-direction: column;
-			gap: 12px;
-			min-height: 0;
+			align-items: center;
+			gap: 8px;
+			flex-shrink: 0;
 		}
 
-		.mini-stat {
-			flex: 1;
-			background: var(--panel);
-			border-radius: var(--radius);
-			box-shadow: var(--shadow-out);
-			padding: 12px 16px;
-			display: flex;
-			flex-direction: column;
-			justify-content: center;
-			gap: 4px;
-			min-height: 0;
-			overflow: hidden;
+		.air-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 5px;
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			border-radius: 999px;
+			padding: 4px 10px 4px 8px;
+			font-size: 11.5px;
+			font-weight: 700;
+			white-space: nowrap;
 		}
 
-		.mini-stat-btn {
+		#aqiIcon {
+			width: 12px;
+			height: 12px;
+		}
+
+		.stat.s-warn {
+			grid-area: warn;
+			--icon-color: var(--muted);
 			border: none;
 			font: inherit;
 			color: var(--text);
@@ -559,21 +582,61 @@ const warningsStatus = warningsError
 			transition: box-shadow 0.15s ease, transform 0.15s ease;
 		}
 
-		.mini-stat-btn:hover,
-		.mini-stat-btn:focus-visible {
+		.stat.s-warn:hover,
+		.stat.s-warn:focus-visible {
 			transform: translateY(-2px);
 			box-shadow: var(--shadow-out), 0 0 0 2px var(--series-fire);
 			outline: none;
 		}
 
-		.mini-stat .sub {
+		.warn-preview {
+			display: flex;
+			flex-direction: column;
+			gap: 5px;
+			margin-top: 4px;
+			overflow: hidden;
+			flex: 1;
+		}
+
+		.warn-preview p {
+			font-size: 12.5px;
+			color: var(--muted);
+			margin: 0;
+		}
+
+		.warn-preview-item {
+			display: flex;
+			align-items: flex-start;
+			gap: 7px;
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
+			color: var(--text) !important;
 		}
 
-		.stat .k,
-		.mini-stat .k {
+		.warn-dot {
+			width: 7px;
+			height: 7px;
+			border-radius: 50%;
+			margin-top: 5px;
+			flex-shrink: 0;
+			background: var(--muted);
+		}
+
+		.warn-dot.aqi-good {
+			background: var(--status-good);
+		}
+		.warn-dot.aqi-warning {
+			background: var(--status-warning);
+		}
+		.warn-dot.aqi-serious {
+			background: var(--status-serious);
+		}
+		.warn-dot.aqi-critical {
+			background: var(--status-critical);
+		}
+
+		.stat .k {
 			display: flex;
 			align-items: center;
 			gap: 7px;
@@ -583,20 +646,14 @@ const warningsStatus = warningsError
 			color: var(--muted);
 		}
 
-		.stat .k .ic,
-		.mini-stat .k .ic {
+		.stat .k .ic {
 			color: var(--icon-color, var(--accent));
 		}
 
-		.stat .v,
-		.mini-stat .v {
+		.stat .v {
 			font-weight: 800;
 			font-size: clamp(1.3rem, 2vw, 1.7rem);
 			font-variant-numeric: tabular-nums;
-		}
-
-		.mini-stat .v {
-			font-size: 1.05rem;
 		}
 
 		.stat .v .unit {
@@ -608,8 +665,7 @@ const warningsStatus = warningsError
 			margin-left: 4px;
 		}
 
-		.stat .sub,
-		.mini-stat .sub {
+		.stat .sub {
 			font-size: 12.5px;
 			color: var(--muted);
 		}
@@ -1030,7 +1086,7 @@ const warningsStatus = warningsError
 					"top top"
 					"hero hero"
 					"pegel fire"
-					"air air"
+					"warn warn"
 					"chart chart"
 					"resptime total"
 					"forecast forecast";
@@ -1072,7 +1128,7 @@ const warningsStatus = warningsError
 					"hero"
 					"pegel"
 					"fire"
-					"air"
+					"warn"
 					"chart"
 					"resptime"
 					"total"
