@@ -6,7 +6,7 @@
 import {
   getLang, setLang, initLang, locale, t, weatherLabel, weekday, weekdayLong,
   trendLabel, aqiLabel, severityLabel, speech, applyStaticTranslations,
-  getColorblind, setColorblind,
+  getHighContrast, setHighContrast,
 } from "./i18n.js";
 
 const BERLIN_LAT = 52.52;
@@ -885,10 +885,10 @@ function setupA11yPanel() {
   });
   document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.lang === getLang()));
 
-  const cbToggle = $("colorblindToggle");
-  if (cbToggle) {
-    cbToggle.checked = getColorblind();
-    cbToggle.addEventListener("change", () => setColorblind(cbToggle.checked));
+  const hcToggle = $("highContrastToggle");
+  if (hcToggle) {
+    hcToggle.checked = getHighContrast();
+    hcToggle.addEventListener("change", () => setHighContrast(hcToggle.checked));
   }
 
   setupSpeech();
@@ -954,7 +954,7 @@ function refreshAll() {
 }
 
 initLang();
-document.documentElement.toggleAttribute("data-colorblind", getColorblind());
+document.documentElement.toggleAttribute("data-high-contrast", getHighContrast());
 loadWarningsData();
 applyStaticTranslations();
 renderWarningsTile();

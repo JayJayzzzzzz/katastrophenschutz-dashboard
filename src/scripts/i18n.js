@@ -203,9 +203,9 @@ export const STRINGS = {
   },
   a11yTitle: { de: "Barrierefreiheit", en: "Accessibility", fr: "Accessibilité", pl: "Dostępność", es: "Accesibilidad" },
   a11yLanguage: { de: "Sprache", en: "Language", fr: "Langue", pl: "Język", es: "Idioma" },
-  a11yColorblind: {
-    de: "Farbenblind-Modus", en: "Color-blind mode", fr: "Mode daltonien", pl: "Tryb dla daltonistów",
-    es: "Modo para daltónicos",
+  a11yHighContrast: {
+    de: "Hoher Kontrast", en: "High contrast", fr: "Contraste élevé", pl: "Wysoki kontrast",
+    es: "Alto contraste",
   },
   a11ySpeak: {
     de: "Lagebericht vorlesen", en: "Read situation report aloud", fr: "Lire le rapport à voix haute",
@@ -350,7 +350,7 @@ export const SPEECH = {
 };
 
 const STORAGE_KEY_LANG = "dashboard-lang";
-const STORAGE_KEY_CB = "dashboard-colorblind";
+const STORAGE_KEY_HC = "dashboard-high-contrast";
 
 let currentLang = "de";
 
@@ -423,21 +423,21 @@ export function initLang() {
   return currentLang;
 }
 
-export function getColorblind() {
+export function getHighContrast() {
   try {
-    return localStorage.getItem(STORAGE_KEY_CB) === "1";
+    return localStorage.getItem(STORAGE_KEY_HC) === "1";
   } catch {
     return false;
   }
 }
 
-export function setColorblind(on) {
+export function setHighContrast(on) {
   try {
-    localStorage.setItem(STORAGE_KEY_CB, on ? "1" : "0");
+    localStorage.setItem(STORAGE_KEY_HC, on ? "1" : "0");
   } catch {
     /* siehe oben */
   }
-  document.documentElement.toggleAttribute("data-colorblind", on);
+  document.documentElement.toggleAttribute("data-high-contrast", on);
 }
 
 // Wendet alle [data-i18n]-Texte und [data-i18n-aria]-aria-labels im Dokument

@@ -42,12 +42,14 @@ Ein Knopf oben rechts (Icon neben der Uhrzeit) öffnet ein Einstellungs-Panel mi
   der Titel. Ein Sprachwechsel braucht keinen neuen Netzwerk-Request: alle
   Sprachversionen werden beim Laden einmal zwischengespeichert und bei
   Bedarf nur neu gerendert (siehe `src/scripts/i18n.js`).
-- **Farbenblind-Modus**: schaltet die Serien-/Status-Farben (Pegel, Brände,
-  Wetter, Luftqualität, Warnstufen) auf die Okabe-Ito-Palette um, eine der
-  gängigen für Farbenblindheit validierten Referenzpaletten. Da jede Farbe
-  im Code ausschließlich als CSS-Variable verwendet wird (nie als fester
-  Hex-Wert), reicht dafür eine reine CSS-Umschaltung — kein Chart wird neu
-  gezeichnet. Zustand und Sprache werden in `localStorage` gemerkt.
+- **Hoher Kontrast**: verstärkt den Textkontrast (hellere `--muted`-Farbe,
+  reduzierte De-Emphase-Deckkraft zurückgedreht), ersetzt die weichen
+  Neumorph-Schatten durch klare, sichtbare Kanten und macht Diagramm-
+  Gitterlinien deutlicher. Warnstufen-Badges bekommen zusätzlich einen
+  Rahmen in ihrer eigenen Farbe. Da Text-, Rahmen- und Schattenfarben im
+  ganzen Stylesheet ausschließlich über CSS-Variablen kommen, reicht dafür
+  eine reine CSS-Umschaltung — kein Chart wird neu gezeichnet. Zustand und
+  Sprache werden in `localStorage` gemerkt.
 - **Sprachausgabe** (Web Speech API, `SpeechSynthesis`): liest eine kurze
   Zusammenfassung der aktuellen Lage vor (Wetter, Pegel, Brände,
   Luftqualität, Warnungen) — in der gerade gewählten Sprache. Funktioniert
