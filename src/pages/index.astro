@@ -11,32 +11,31 @@
 // einem Zeitplan neu, damit die Warnungen halbwegs aktuell bleiben.
 
 const NINA_AGS = "110000000000"; // Berlin, Bundesland-Ebene
-
-const SEVERITY_STATUS: Record<string, { cls: string; label: string }> = {
-	Extreme: { cls: "aqi-critical", label: "Extrem" },
-	Severe: { cls: "aqi-serious", label: "Schwer" },
-	Moderate: { cls: "aqi-warning", label: "Mittel" },
-	Minor: { cls: "aqi-good", label: "Gering" },
-};
+const NINA_LANGS = ["de", "en", "fr", "pl", "es"] as const;
 const SEVERITY_ORDER: Record<string, number> = { Extreme: 4, Severe: 3, Moderate: 2, Minor: 1 };
 
-function formatDe(iso: string | null | undefined) {
-	if (!iso) return "–";
-	return new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + " Uhr";
+interface WarningLangBlock {
+	headline: string;
+	description: string;
+	instruction: string | null;
+	senderName: string;
 }
 
 interface Warning {
 	id: string;
-	headline: string;
 	severity: string;
-	senderName: string;
 	onset: string | null;
 	expires: string | null;
-	description: string;
-	instruction: string | null;
 	areaDesc: string | null;
+	langs: Record<string, WarningLangBlock>;
 }
 
+// Die NINA-Warnungen kommen bereits offiziell mehrsprachig vom Bund (de, en,
+// fr, pl, es u. a. — geprüft: Überschrift, Beschreibung UND Handlungs-
+// empfehlung sind jeweils vollständig übersetzt, nicht nur der Titel). Wir
+// holen für jede Warnung alle fünf im Dashboard unterstützten Sprachen und
+// liefern sie fertig ans Frontend, das rein client-seitig danach rendert
+// (siehe dashboard.js) — so kostet ein Sprachwechsel keinen neuen Request.
 let warnings: Warning[] = [];
 let warningsError = false;
 
@@ -46,23 +45,33 @@ try {
 	const list: any[] = await listRes.json();
 
 	const details = await Promise.all(
-		list.slice(0, 12).map(async (entry: any): Promise<Warning | null> => {
+		list.slice(0, 10).map(async (entry: any): Promise<Warning | null> => {
 			try {
 				const res = await fetch(`https://warnung.bund.de/api31/warnings/${encodeURIComponent(entry.id)}.json`);
 				if (!res.ok) return null;
 				const detail: any = await res.json();
-				const info = (detail.info || []).find((i: any) => i.language?.startsWith("de")) || detail.info?.[0];
-				if (!info) return null;
+				const infoList: any[] = detail.info || [];
+				const deInfo = infoList.find((i) => i.language?.startsWith("de")) || infoList[0];
+				if (!deInfo) return null;
+
+				const langs: Record<string, WarningLangBlock> = {};
+				for (const lang of NINA_LANGS) {
+					const info = infoList.find((i: any) => i.language?.toLowerCase().startsWith(lang)) || deInfo;
+					langs[lang] = {
+						headline: info.headline,
+						description: info.description,
+						instruction: info.instruction ?? null,
+						senderName: info.senderName,
+					};
+				}
+
 				return {
 					id: entry.id,
-					headline: info.headline,
-					severity: info.severity,
-					senderName: info.senderName,
-					onset: info.onset,
-					expires: info.expires,
-					description: info.description,
-					instruction: info.instruction,
-					areaDesc: info.area?.[0]?.areaDesc,
+					severity: deInfo.severity,
+					onset: deInfo.onset,
+					expires: deInfo.expires,
+					areaDesc: deInfo.area?.[0]?.areaDesc ?? null,
+					langs,
 				};
 			} catch {
 				return null;
@@ -79,28 +88,27 @@ try {
 }
 
 if (process.env.DASHBOARD_TEST_WARNING === "1") {
+	const testBlock: WarningLangBlock = {
+		headline: "Amtliche WARNUNG vor STURMBÖEN",
+		description: "Es treten Sturmböen mit Geschwindigkeiten um 65 km/h auf.",
+		instruction: "Objekte sichern.<br/>Vorsicht bei herabfallenden Ästen.",
+		senderName: "Deutscher Wetterdienst",
+	};
 	warnings = [
 		{
 			id: "test-1",
 			severity: "Severe",
-			headline: "Amtliche WARNUNG vor STURMBÖEN",
-			senderName: "Deutscher Wetterdienst",
 			onset: new Date().toISOString(),
 			expires: new Date(Date.now() + 3600_000).toISOString(),
-			description: "Es treten Sturmböen mit Geschwindigkeiten um 65 km/h auf.",
-			instruction: "Objekte sichern.<br/>Vorsicht bei herabfallenden Ästen.",
 			areaDesc: "Berlin",
+			langs: { de: testBlock, en: testBlock, fr: testBlock, pl: testBlock, es: testBlock },
 		},
 	];
+	warningsError = false;
 }
 
-const buildStamp = new Date().toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
-const warningsStatus = warningsError
-	? { cls: "", label: "Keine Daten" }
-	: warnings.length > 0
-		? SEVERITY_STATUS[warnings[0].severity] || SEVERITY_STATUS.Minor
-		: { cls: "aqi-good", label: "Keine aktiv" };
+const buildStamp = new Date().toISOString();
+const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp });
 ---
 
 <html lang="de">
@@ -139,6 +147,9 @@ const warningsStatus = warningsError
 			<symbol id="i-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-2"/><path d="M9 2h6"/><path d="M12 2v2"/></symbol>
 			<symbol id="i-siren" viewBox="0 0 24 24"><path d="M12 4a5 5 0 0 1 5 5v3H7V9a5 5 0 0 1 5-5z"/><path d="M5 15.5h14l1 4.5H4l1-4.5z"/><path d="M12 2v1"/></symbol>
 			<symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2z"/><path d="M9 4v14M15 6v14"/></symbol>
+			<symbol id="i-a11y" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="8" r="1.5" fill="currentColor" stroke="none"/><path d="M7 11.3c1.6.8 3.4 1.2 5 1.2s3.4-.4 5-1.2M12 12.5V17M9.5 20l2.5-3 2.5 3"/></symbol>
+			<symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+			<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/></symbol>
 		</defs>
 	</svg>
 
@@ -146,46 +157,51 @@ const warningsStatus = warningsError
 		<div class="layout">
 			<div class="area-top">
 				<div class="place"><svg class="ic"><use href="#i-pin"/></svg>Berlin, DE</div>
-				<div class="timestamp">
-					<svg class="ic"><use href="#i-clock"/></svg>
-					<span id="liveDate">–</span> · <span id="liveClock">--:--:--</span> Uhr
-					<span class="live-dot" aria-hidden="true"></span>
+				<div class="top-right">
+					<div class="timestamp">
+						<svg class="ic"><use href="#i-clock"/></svg>
+						<span id="liveDate">–</span> · <span id="liveClock">--:--:--</span>
+						<span class="live-dot" aria-hidden="true"></span>
+					</div>
+					<button type="button" class="a11y-open" id="a11yOpen" aria-haspopup="dialog" data-i18n-aria="a11yBtnAria" aria-label="Barrierefreiheit-Einstellungen">
+						<svg class="ic"><use href="#i-a11y"/></svg>
+					</button>
 				</div>
 			</div>
 
-			<section class="hero-block" aria-label="Aktuelles Wetter und Luftqualität">
+			<section class="hero-block" aria-label="Aktuelles Wetter und Luftqualität" data-i18n-aria="heroAriaLabel">
 				<div class="hero-top">
 					<div class="temp-big"><span id="temperature">--°</span></div>
 					<div class="hero-icon-col">
 						<svg class="hero-icon" id="heroIcon"><use href="#i-cloud"/></svg>
-						<div class="air-badge" title="Luftqualität">
+						<div class="air-badge" data-i18n-title="airQualityTitle" title="Luftqualität">
 							<svg class="ic" id="aqiIcon"><use href="#i-shield"/></svg>
 							<span id="aqiValue">--</span>
 						</div>
 					</div>
 				</div>
-				<div class="cond" id="description">Wetter wird geladen …</div>
+				<div class="cond" id="description" data-i18n="condLoading">Wetter wird geladen …</div>
 				<div class="minmax">
 					<svg class="ic"><use href="#i-down"/></svg><strong id="tempMin">--°</strong>
 					<svg class="ic"><use href="#i-up"/></svg><strong id="tempMax">--°</strong>
 				</div>
 				<div class="chips">
 					<span class="chip"><svg class="ic sm"><use href="#i-wind"/></svg><span id="chipWind">-- km/h</span></span>
-					<span class="chip">Böen <span id="chipGust">-- km/h</span></span>
+					<span class="chip"><span data-i18n="chipGust">Böen</span> <span id="chipGust">-- km/h</span></span>
 					<span class="chip"><svg class="ic sm"><use href="#i-drop"/></svg><span id="chipHumidity">-- %</span></span>
-					<span class="chip">Niederschlag <span id="chipPrecip">-- mm</span></span>
-					<span class="chip">Luftdruck <span id="chipPressure">-- hPa</span></span>
+					<span class="chip"><span data-i18n="chipPrecip">Niederschlag</span> <span id="chipPrecip">-- mm</span></span>
+					<span class="chip"><span data-i18n="chipPressure">Luftdruck</span> <span id="chipPressure">-- hPa</span></span>
 					<span class="chip">UV <span id="chipUV">--</span></span>
 					<span class="chip"><svg class="ic sm"><use href="#i-sun"/></svg><span id="chipSun">--:-- · --:--</span></span>
-					<span class="chip">Luft <span id="aqiDetail">Lädt …</span></span>
+					<span class="chip"><span data-i18n="chipAir">Luft</span> <span id="aqiDetail">Lädt …</span></span>
 				</div>
-				<div class="status" id="weatherStatus">Lädt …</div>
+				<div class="status" id="weatherStatus" data-i18n="loading">Lädt …</div>
 			</section>
 
-			<section class="stat s-pegel" aria-label="Pegelstand Spree Berlin-Köpenick, 48-Stunden-Verlauf">
-				<div class="k"><svg class="ic"><use href="#i-drop"/></svg>Pegel Spree · Köpenick</div>
+			<section class="stat s-pegel" aria-label="Pegelstand Spree Berlin-Köpenick, 48-Stunden-Verlauf" data-i18n-aria="pegelAriaLabel">
+				<div class="k"><svg class="ic"><use href="#i-drop"/></svg><span data-i18n="pegelLabel">Pegel Spree · Köpenick</span></div>
 				<div class="v" id="pegelValue">-- cm</div>
-				<div class="sub" id="pegelTrend">Lädt …</div>
+				<div class="sub" id="pegelTrend" data-i18n="loading">Lädt …</div>
 				<div class="mini-chart">
 					<svg id="pegelChart" aria-hidden="true"></svg>
 					<div id="pegelTooltip" class="chart-tooltip" hidden></div>
@@ -193,43 +209,26 @@ const warningsStatus = warningsError
 				<div class="sub muted" id="pegelTime"></div>
 			</section>
 
-			<section class="stat s-fire" aria-label="Brandeinsätze der Berliner Feuerwehr, 14-Tage-Verlauf">
-				<div class="k"><svg class="ic"><use href="#i-flame"/></svg>Brände · 14-Tage-Verlauf</div>
-				<div class="v"><span id="fireCount">--</span> <span class="unit">Einsätze</span></div>
-				<div class="sub">am <span id="fireDate">--</span></div>
+			<section class="stat s-fire" aria-label="Brandeinsätze der Berliner Feuerwehr, 14-Tage-Verlauf" data-i18n-aria="fireAriaLabel">
+				<div class="k"><svg class="ic"><use href="#i-flame"/></svg><span data-i18n="fireLabel">Brände · 14-Tage-Verlauf</span></div>
+				<div class="v"><span id="fireCount">--</span> <span class="unit" data-i18n="unitEinsaetze">Einsätze</span></div>
+				<div class="sub"><span data-i18n="amPrefix">am</span> <span id="fireDate">--</span></div>
 				<div class="mini-chart">
 					<svg id="fireChart" aria-hidden="true"></svg>
 					<div id="fireTooltip" class="chart-tooltip" hidden></div>
 				</div>
 			</section>
 
-			<button type="button" class="stat s-warn" id="warningsOpen" aria-haspopup="dialog" aria-label="Amtliche Warnungen, Details öffnen">
-				<div class="k"><svg class="ic"><use href="#i-alert"/></svg>Warnungen</div>
-				<div class:list={["v", warningsStatus.cls]}>
-					{warningsError ? "Keine Daten" : warnings.length > 0 ? `${warnings.length} aktiv` : "Keine aktiv"}
-				</div>
-				<div class="sub">{warningsError ? "Bund/DWD für Berlin nicht erreichbar" : "Bund/DWD für Berlin"}</div>
-
-				<div class="warn-preview">
-					{warningsError ? (
-						<p>Warnungen aktuell nicht abrufbar.</p>
-					) : warnings.length === 0 ? (
-						<p>Keine amtlichen Warnungen (NINA/DWD/BBK) für Berlin.</p>
-					) : (
-						warnings.slice(0, 3).map((w) => (
-							<p class="warn-preview-item">
-								<span class:list={["warn-dot", (SEVERITY_STATUS[w.severity] || SEVERITY_STATUS.Minor).cls]}></span>
-								{w.headline}
-							</p>
-						))
-					)}
-				</div>
-
-				<div class="sub muted">Details ansehen</div>
+			<button type="button" class="stat s-warn" id="warningsOpen" aria-haspopup="dialog" aria-label="Amtliche Warnungen, Details öffnen" data-i18n-aria="warnBtnAriaLabel">
+				<div class="k"><svg class="ic"><use href="#i-alert"/></svg><span data-i18n="warnLabel">Warnungen</span></div>
+				<div class="v">…</div>
+				<div class="sub">…</div>
+				<div class="warn-preview"></div>
+				<div class="sub muted">…</div>
 			</button>
 
 			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf">
-				<div class="chart-head"><span>24-Std.-Verlauf</span><b id="chartNow">--°</b></div>
+				<div class="chart-head"><span data-i18n="chart24h">24-Std.-Verlauf</span><b id="chartNow">--°</b></div>
 				<div class="chart-wrap">
 					<svg id="weatherChart" preserveAspectRatio="none" aria-hidden="true"></svg>
 					<div id="chartTooltip" class="chart-tooltip" hidden></div>
@@ -237,9 +236,9 @@ const warningsStatus = warningsError
 			</section>
 
 			<section class="stat s-resptime" aria-label="Durchschnittliche Reaktionszeit der Feuerwehr, letzte 30 Tage">
-				<div class="k"><svg class="ic"><use href="#i-stopwatch"/></svg>Ø Reaktionszeit (30 Tage)</div>
+				<div class="k"><svg class="ic"><use href="#i-stopwatch"/></svg><span data-i18n="respLabel">Ø Reaktionszeit (30 Tage)</span></div>
 				<div class="v"><span id="respTimeValue">--</span></div>
-				<div class="sub">Eintreffen 1. Löschfahrzeug</div>
+				<div class="sub" data-i18n="respSub">Eintreffen 1. Löschfahrzeug</div>
 				<div class="mini-chart">
 					<svg id="respTimeChart" aria-hidden="true"></svg>
 					<div id="respTimeTooltip" class="chart-tooltip" hidden></div>
@@ -248,26 +247,26 @@ const warningsStatus = warningsError
 
 			<div class="stack-col" style="grid-area: total;">
 				<section class="stat tile-half" aria-label="Gesamteinsätze der Berliner Feuerwehr, Vortag">
-					<div class="k"><svg class="ic"><use href="#i-siren"/></svg>Gesamteinsätze</div>
+					<div class="k"><svg class="ic"><use href="#i-siren"/></svg><span data-i18n="totalLabel">Gesamteinsätze</span></div>
 					<div class="v"><span id="totalMissionsValue">--</span></div>
-					<div class="sub">alle Kategorien · am <span id="fireDate2">--</span></div>
+					<div class="sub"><span data-i18n="allCategories">alle Kategorien</span> · <span data-i18n="amPrefix">am</span> <span id="fireDate2">--</span></div>
 				</section>
 
 				<button type="button" class="stat tile-half tile-half-btn" id="hazardMapOpen" aria-haspopup="dialog">
-					<div class="k"><svg class="ic"><use href="#i-map"/></svg>Gefahrenkarte</div>
-					<div class="v">Hochwasser</div>
-					<div class="sub">Amtliche Karte ansehen</div>
+					<div class="k"><svg class="ic"><use href="#i-map"/></svg><span data-i18n="hazardLabel">Gefahrenkarte</span></div>
+					<div class="v" data-i18n="hazardValue">Hochwasser</div>
+					<div class="sub" data-i18n="hazardCta">Amtliche Karte ansehen</div>
 				</button>
 			</div>
 
-			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage, zum Aufklappen antippen"></section>
+			<section class="forecast" id="forecastRow" aria-label="7-Tage-Vorhersage, zum Aufklappen antippen" data-i18n-aria="forecastAriaLabel"></section>
 		</div>
 	</main>
 
 	<div class="day-modal" id="dayModal" hidden>
 		<div class="day-modal-backdrop" id="dayModalBackdrop"></div>
 		<div class="day-modal-panel" role="dialog" aria-modal="true" aria-labelledby="dayModalDate">
-			<button class="day-modal-close" id="dayModalClose" aria-label="Schließen">
+			<button class="day-modal-close" id="dayModalClose" aria-label="Schließen" data-i18n-aria="close">
 				<svg class="ic"><use href="#i-close"/></svg>
 			</button>
 			<div class="day-modal-head">
@@ -282,12 +281,12 @@ const warningsStatus = warningsError
 				<span class="lo"><svg class="ic"><use href="#i-down"/></svg><span id="dayModalLo">--°</span></span>
 			</div>
 			<div class="day-modal-grid">
-				<div class="dm-stat"><div class="dm-k">Niederschlag</div><div class="dm-v" id="dayModalPrecip">--</div></div>
-				<div class="dm-stat"><div class="dm-k">Regenwahrscheinlichkeit</div><div class="dm-v" id="dayModalPrecipProb">--</div></div>
-				<div class="dm-stat"><div class="dm-k">Wind (max.)</div><div class="dm-v" id="dayModalWind">--</div></div>
-				<div class="dm-stat"><div class="dm-k">Böen (max.)</div><div class="dm-v" id="dayModalGust">--</div></div>
-				<div class="dm-stat"><div class="dm-k">UV-Index (max.)</div><div class="dm-v" id="dayModalUV">--</div></div>
-				<div class="dm-stat"><div class="dm-k">Sonnenauf-/-untergang</div><div class="dm-v" id="dayModalSun">--</div></div>
+				<div class="dm-stat"><div class="dm-k" data-i18n="dmPrecip">Niederschlag</div><div class="dm-v" id="dayModalPrecip">--</div></div>
+				<div class="dm-stat"><div class="dm-k" data-i18n="dmPrecipProb">Regenwahrscheinlichkeit</div><div class="dm-v" id="dayModalPrecipProb">--</div></div>
+				<div class="dm-stat"><div class="dm-k" data-i18n="dmWind">Wind (max.)</div><div class="dm-v" id="dayModalWind">--</div></div>
+				<div class="dm-stat"><div class="dm-k" data-i18n="dmGust">Böen (max.)</div><div class="dm-v" id="dayModalGust">--</div></div>
+				<div class="dm-stat"><div class="dm-k" data-i18n="dmUv">UV-Index (max.)</div><div class="dm-v" id="dayModalUV">--</div></div>
+				<div class="dm-stat"><div class="dm-k" data-i18n="dmSun">Sonnenauf-/-untergang</div><div class="dm-v" id="dayModalSun">--</div></div>
 			</div>
 		</div>
 	</div>
@@ -295,46 +294,23 @@ const warningsStatus = warningsError
 	<div class="day-modal" id="warnModal" hidden>
 		<div class="day-modal-backdrop" id="warnModalBackdrop"></div>
 		<div class="day-modal-panel warn-modal-panel" role="dialog" aria-modal="true" aria-labelledby="warnModalTitle">
-			<button class="day-modal-close" id="warnModalClose" aria-label="Schließen">
+			<button class="day-modal-close" id="warnModalClose" aria-label="Schließen" data-i18n-aria="close">
 				<svg class="ic"><use href="#i-close"/></svg>
 			</button>
-			<h2 id="warnModalTitle">Amtliche Warnungen · Berlin</h2>
-
-			{warningsError ? (
-				<p class="warn-empty">Die Warnungen (NINA/BBK) konnten beim letzten Build der Seite nicht geladen werden. Das ist keine Aussage darüber, ob gerade eine Warnung besteht — bitte zusätzlich <a href="https://warnung.bund.de" target="_blank" rel="noopener">warnung.bund.de</a> prüfen.</p>
-			) : warnings.length === 0 ? (
-				<p class="warn-empty">Aktuell liegen keine amtlichen Warnungen (NINA/DWD/BBK) für Berlin vor.</p>
-			) : (
-				<div class="warn-list">
-					{warnings.map((w) => (
-						<article class="warn-card">
-							<div class="warn-card-head">
-								<span class:list={["warn-badge", (SEVERITY_STATUS[w.severity] || SEVERITY_STATUS.Minor).cls]}>
-									{(SEVERITY_STATUS[w.severity] || SEVERITY_STATUS.Minor).label}
-								</span>
-								<span class="warn-time">gültig bis {formatDe(w.expires)}</span>
-							</div>
-							<h3>{w.headline}</h3>
-							{w.description && <p class="warn-desc">{w.description}</p>}
-							{w.instruction && <p class="warn-instr" set:html={w.instruction} />}
-							<p class="warn-meta">{w.senderName}{w.areaDesc ? ` · ${w.areaDesc}` : ""}</p>
-						</article>
-					))}
-				</div>
-			)}
-
-			<p class="warn-footnote">Quelle: NINA / Bund (warnung.bund.de) · Stand des letzten Seiten-Builds: {buildStamp}</p>
+			<h2 id="warnModalTitle">…</h2>
+			<div id="warnModalBody"></div>
+			<p class="warn-footnote" id="warnFootnote"></p>
 		</div>
 	</div>
 
 	<div class="day-modal" id="hazardModal" hidden>
 		<div class="day-modal-backdrop" id="hazardModalBackdrop"></div>
 		<div class="day-modal-panel hazard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="hazardModalTitle">
-			<button class="day-modal-close" id="hazardModalClose" aria-label="Schließen">
+			<button class="day-modal-close" id="hazardModalClose" aria-label="Schließen" data-i18n-aria="close">
 				<svg class="ic"><use href="#i-close"/></svg>
 			</button>
-			<h2 id="hazardModalTitle">Hochwassergefahrenkarte · Berlin</h2>
-			<p class="hazard-sub">
+			<h2 id="hazardModalTitle" data-i18n="hazardModalTitle">Hochwassergefahrenkarte · Berlin</h2>
+			<p class="hazard-sub" data-i18n="hazardSub">
 				Amtliche Karte des Umweltatlas Berlin: Gewässerabschnitte, für die eine Hochwassergefahr amtlich ausgewiesen ist,
 				in drei Wahrscheinlichkeits-Szenarien (häufig, mittel, extrem). Dunklere Blautöne zeigen eine größere Wassertiefe im jeweiligen Szenario.
 			</p>
@@ -343,12 +319,50 @@ const warningsStatus = warningsError
 				<img class="hazard-layer" src="https://gdi.berlin.de/services/wms/ua_hochwassergefahrenkarten?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=c_hwgk_niedrig,b_hwgk_mittel,a_hwgk_hoch&STYLES=,,&CRS=EPSG:4326&BBOX=52.33,13.08,52.68,13.76&WIDTH=900&HEIGHT=763&FORMAT=image/png&TRANSPARENT=TRUE" alt="Hochwassergefahrenkarte (Umweltatlas Berlin)" loading="lazy" />
 			</div>
 			<p class="warn-footnote">
-				Quelle: <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a>
-				(Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen) · statische amtliche Gefahrenkarte, keine Live-Daten zu einem laufenden Einsatz ·
-				<a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Vollständige interaktive Karte öffnen ↗</a>
+				<span data-i18n="hazardSourcePrefix">Quelle:</span> <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a>
+				(<span data-i18n="hazardSourceOrg">Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen</span>) · <span data-i18n="hazardStaticNote">statische amtliche Gefahrenkarte, keine Live-Daten zu einem laufenden Einsatz</span> ·
+				<a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener" data-i18n="hazardFullMapLink">Vollständige interaktive Karte öffnen ↗</a>
 			</p>
 		</div>
 	</div>
+
+	<div class="day-modal" id="a11yPanel" hidden>
+		<div class="day-modal-backdrop" id="a11yPanelBackdrop"></div>
+		<div class="day-modal-panel a11y-panel-box" role="dialog" aria-modal="true" aria-labelledby="a11yPanelTitle">
+			<button class="day-modal-close" id="a11yPanelClose" aria-label="Schließen" data-i18n-aria="close">
+				<svg class="ic"><use href="#i-close"/></svg>
+			</button>
+			<h2 id="a11yPanelTitle" data-i18n="a11yTitle">Barrierefreiheit</h2>
+
+			<div class="a11y-group">
+				<div class="a11y-group-label"><svg class="ic sm"><use href="#i-globe"/></svg><span data-i18n="a11yLanguage">Sprache</span></div>
+				<div class="lang-buttons">
+					<button type="button" class="lang-btn" data-lang="de">DE · Deutsch</button>
+					<button type="button" class="lang-btn" data-lang="en">EN · English</button>
+					<button type="button" class="lang-btn" data-lang="fr">FR · Français</button>
+					<button type="button" class="lang-btn" data-lang="pl">PL · Polski</button>
+					<button type="button" class="lang-btn" data-lang="es">ES · Español</button>
+				</div>
+			</div>
+
+			<div class="a11y-group">
+				<label class="a11y-toggle">
+					<input type="checkbox" id="colorblindToggle" />
+					<span class="a11y-toggle-track" aria-hidden="true"></span>
+					<span data-i18n="a11yColorblind">Farbenblind-Modus</span>
+				</label>
+			</div>
+
+			<div class="a11y-group">
+				<button type="button" class="a11y-speak-btn" id="speakBtn">
+					<svg class="ic"><use href="#i-volume"/></svg>
+					<span id="speakBtnLabel" data-i18n="a11ySpeak">Lagebericht vorlesen</span>
+				</button>
+			</div>
+		</div>
+	</div>
+
+	<script type="application/json" id="warnings-data" is:inline set:html={warningsDataJson}></script>
 
 	<script>
 		import "../scripts/dashboard.js";
@@ -373,6 +387,21 @@ const warningsStatus = warningsError
 			--radius: 20px;
 			--shadow-out: 9px 9px 18px rgba(0, 0, 0, 0.5), -7px -7px 16px rgba(255, 255, 255, 0.025);
 			--shadow-in: inset 4px 4px 10px rgba(0, 0, 0, 0.4), inset -3px -3px 8px rgba(255, 255, 255, 0.02);
+		}
+
+		/* Farbenblind-Modus: ersetzt nur die Farb-Variablen (Okabe-Ito-Palette,
+		   eine der gängigen für Farbenblindheit validierten Referenzpaletten).
+		   Da alle Charts/Badges ihre Farbe ausschließlich über diese Variablen
+		   bekommen (nie als fester Hex-Wert), reicht dieser eine Block aus —
+		   nichts muss neu gezeichnet werden. */
+		:root[data-colorblind] {
+			--series-weather: #009e73;
+			--series-pegel: #0072b2;
+			--series-fire: #d55e00;
+			--status-good: #009e73;
+			--status-warning: #f0e442;
+			--status-serious: #e69f00;
+			--status-critical: #cc79a7;
 		}
 
 		* {
@@ -459,6 +488,34 @@ const warningsStatus = warningsError
 			border-radius: 50%;
 			background: var(--accent);
 			box-shadow: 0 0 0 3px rgba(34, 166, 126, 0.25);
+		}
+
+		.top-right {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+		}
+
+		.a11y-open {
+			width: 32px;
+			height: 32px;
+			border-radius: 999px;
+			border: none;
+			background: var(--panel);
+			box-shadow: var(--shadow-out);
+			color: var(--muted);
+			cursor: pointer;
+			display: grid;
+			place-items: center;
+			flex-shrink: 0;
+			transition: color 0.15s ease, transform 0.15s ease;
+		}
+
+		.a11y-open:hover,
+		.a11y-open:focus-visible {
+			color: var(--series-pegel);
+			transform: translateY(-1px);
+			outline: none;
 		}
 
 		.hero-block,
@@ -1066,19 +1123,19 @@ const warningsStatus = warningsError
 		}
 
 		.warn-badge.aqi-good {
-			background: rgba(12, 163, 12, 0.18);
+			background: color-mix(in srgb, var(--status-good) 18%, transparent);
 			color: var(--status-good);
 		}
 		.warn-badge.aqi-warning {
-			background: rgba(250, 178, 25, 0.18);
+			background: color-mix(in srgb, var(--status-warning) 18%, transparent);
 			color: var(--status-warning);
 		}
 		.warn-badge.aqi-serious {
-			background: rgba(236, 131, 90, 0.18);
+			background: color-mix(in srgb, var(--status-serious) 18%, transparent);
 			color: var(--status-serious);
 		}
 		.warn-badge.aqi-critical {
-			background: rgba(208, 59, 59, 0.2);
+			background: color-mix(in srgb, var(--status-critical) 20%, transparent);
 			color: var(--status-critical);
 		}
 
@@ -1160,6 +1217,140 @@ const warningsStatus = warningsError
 			inset: 0;
 			width: 100%;
 			height: 100%;
+		}
+
+		/* ---------- Barrierefreiheit-Panel ---------- */
+
+		.a11y-panel-box {
+			width: min(380px, 100%);
+		}
+
+		.a11y-panel-box h2 {
+			font-size: 17px;
+			font-weight: 800;
+			margin-bottom: 16px;
+			padding-right: 30px;
+		}
+
+		.a11y-group {
+			margin-bottom: 18px;
+		}
+
+		.a11y-group:last-child {
+			margin-bottom: 0;
+		}
+
+		.a11y-group-label {
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			font-size: 12px;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			color: var(--muted);
+			margin-bottom: 10px;
+		}
+
+		.lang-buttons {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+
+		.lang-btn {
+			font: inherit;
+			font-size: 13.5px;
+			text-align: left;
+			border: none;
+			border-radius: 12px;
+			padding: 9px 12px;
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			color: var(--text);
+			cursor: pointer;
+		}
+
+		.lang-btn.is-active {
+			box-shadow: 0 0 0 2px var(--series-pegel);
+			color: var(--series-pegel);
+			font-weight: 700;
+		}
+
+		.a11y-toggle {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			font-size: 13.5px;
+			cursor: pointer;
+		}
+
+		.a11y-toggle input {
+			position: absolute;
+			opacity: 0;
+			width: 1px;
+			height: 1px;
+		}
+
+		.a11y-toggle-track {
+			position: relative;
+			width: 40px;
+			height: 22px;
+			border-radius: 999px;
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			flex-shrink: 0;
+			transition: background 0.15s ease;
+		}
+
+		.a11y-toggle-track::after {
+			content: "";
+			position: absolute;
+			top: 3px;
+			left: 3px;
+			width: 16px;
+			height: 16px;
+			border-radius: 50%;
+			background: var(--muted);
+			transition: transform 0.15s ease, background 0.15s ease;
+		}
+
+		.a11y-toggle input:checked + .a11y-toggle-track {
+			background: color-mix(in srgb, var(--series-pegel) 25%, var(--bg));
+		}
+
+		.a11y-toggle input:checked + .a11y-toggle-track::after {
+			transform: translateX(18px);
+			background: var(--series-pegel);
+		}
+
+		.a11y-toggle input:focus-visible + .a11y-toggle-track {
+			outline: 2px solid var(--series-pegel);
+			outline-offset: 2px;
+		}
+
+		.a11y-speak-btn {
+			display: flex;
+			align-items: center;
+			gap: 9px;
+			width: 100%;
+			font: inherit;
+			font-size: 13.5px;
+			font-weight: 700;
+			border: none;
+			border-radius: 12px;
+			padding: 11px 14px;
+			background: var(--series-pegel);
+			color: #fff;
+			cursor: pointer;
+		}
+
+		.a11y-speak-btn.is-speaking {
+			background: var(--status-critical);
+		}
+
+		.a11y-speak-btn:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
 		}
 
 		/* ---------- Responsive: Tablet ---------- */

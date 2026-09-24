@@ -1,5 +1,13 @@
 // Katastrophenschutz Berlin — Lagebild-Dashboard
-// Alle Daten werden client-seitig geladen (statische GitHub-Pages-Seite, kein Server/Build-Step nötig).
+// Alle Live-Daten werden client-seitig geladen (statische GitHub-Pages-Seite,
+// kein Server/Build-Step nötig) — Ausnahme: die amtlichen Warnungen, siehe
+// index.astro und den Abschnitt "Warnungen" unten.
+
+import {
+  getLang, setLang, initLang, locale, t, weatherLabel, weekday, weekdayLong,
+  trendLabel, aqiLabel, severityLabel, speech, applyStaticTranslations,
+  getColorblind, setColorblind,
+} from "./i18n.js";
 
 const BERLIN_LAT = 52.52;
 const BERLIN_LON = 13.405;
@@ -13,9 +21,6 @@ const FIRE_DATA_URL =
 const PEGEL_UUID = "47d3e815-c556-4e1b-93de-9fe07329fb00";
 const PEGEL_BASE = `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/${PEGEL_UUID}`;
 
-const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-const WEEKDAYS_LONG = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-
 const WEATHER_ICON_BY_CODE = {
   0: "sun", 1: "cloud-sun", 2: "cloud-sun", 3: "cloud",
   45: "fog", 48: "fog",
@@ -26,24 +31,8 @@ const WEATHER_ICON_BY_CODE = {
   95: "thunder", 96: "thunder", 99: "thunder",
 };
 
-const WEATHER_LABEL_BY_CODE = {
-  0: "Klarer Himmel", 1: "Meistens klar", 2: "Teilweise bewölkt", 3: "Bewölkt",
-  45: "Nebel", 48: "Raureifnebel",
-  51: "Leichter Nieselregen", 53: "Nieselregen", 55: "Starker Nieselregen",
-  56: "Leichter gefrierender Regen", 57: "Gefrierender Regen",
-  61: "Leichter Regen", 63: "Regen", 65: "Starker Regen",
-  66: "Leichter gefrierender Regen", 67: "Gefrierender Regen",
-  71: "Leichter Schneefall", 73: "Schneefall", 75: "Starker Schneefall", 77: "Schneekörner",
-  80: "Leichte Regenschauer", 81: "Regenschauer", 82: "Starke Regenschauer",
-  85: "Leichte Schneeschauer", 86: "Starke Schneeschauer",
-  95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Schweres Gewitter",
-};
-
 function iconFor(code) {
   return WEATHER_ICON_BY_CODE[code] || "cloud";
-}
-function labelFor(code) {
-  return WEATHER_LABEL_BY_CODE[code] || "Wetterlage";
 }
 function $(id) {
   return document.getElementById(id);
@@ -56,13 +45,13 @@ function iconMarkup(name, extraClass = "") {
   return `<svg class="ic ${extraClass}"><use href="#i-${name}"/></svg>`;
 }
 function formatClock(timestamp) {
-  return new Date(timestamp).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(timestamp).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
 }
 function debounce(fn, wait) {
-  let t;
+  let timer;
   return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), wait);
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), wait);
   };
 }
 
@@ -72,16 +61,17 @@ function updateClock() {
   const now = new Date();
   setText(
     "liveDate",
-    now.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })
+    now.toLocaleDateString(locale(), { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })
   );
+  const suffix = t("clockSuffix");
   setText(
     "liveClock",
-    now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + (suffix ? " " + suffix : "")
   );
 }
 
 function markUpdated(elId) {
-  setText(elId, "Stand " + new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
+  setText(elId, t("standPrefix") + " " + new Date().toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }));
 }
 
 // ---------- Generische Chart-Zeichenfunktionen ----------
@@ -90,6 +80,11 @@ function markUpdated(elId) {
 // X/Y-Faktoren gestreckt (der Bug im ersten Prototyp: festes 420×220-Raster
 // + preserveAspectRatio="none" auf einem anders großen Element -> verzerrte
 // Linien UND Zahlen).
+//
+// Die Serien-/Status-Farben werden immer als CSS-Variable (z. B.
+// "var(--series-pegel)") übergeben statt als fester Hex-Wert — dadurch
+// reicht für den Farbenblind-Modus eine reine CSS-Umschaltung der
+// Variablen auf der Root-Ebene, ohne dass hier neu gezeichnet werden muss.
 
 const charts = {}; // name -> { svg, tooltip, draw: fn() }
 
@@ -270,9 +265,16 @@ function drawBarChart(svg, tooltip, values, labels, opts) {
   }
 }
 
+// ---------- Zusammenfassung für die Sprachausgabe ----------
+// Wird nach jedem erfolgreichen Laden aktualisiert, damit der "Vorlesen"-
+// Knopf ohne erneuten Netzwerk-Request funktioniert.
+const speechState = {};
+
 // ---------- Wetter (aktuell + 24h-Verlauf + 7-Tage) ----------
 
 let forecastDays = [];
+let lastWeatherPayload = null;
+let openDayIndex = null;
 
 async function loadWeather() {
   try {
@@ -285,61 +287,72 @@ async function loadWeather() {
 
     const response = await fetch(url);
     if (!response.ok) throw new Error("Wetterdaten nicht erreichbar");
-    const data = await response.json();
-    const current = data.current;
-    const code = current.weather_code;
-
-    setText("temperature", Math.round(current.temperature_2m) + "°");
-    setText("description", labelFor(code));
-    setText("tempMin", Math.round(data.daily.temperature_2m_min[0]) + "°");
-    setText("tempMax", Math.round(data.daily.temperature_2m_max[0]) + "°");
-
-    const heroIcon = $("heroIcon");
-    if (heroIcon) heroIcon.innerHTML = `<use href="#i-${iconFor(code)}"/>`;
-
-    // Open-Meteo liefert Windwerte standardmäßig bereits in km/h (kein m/s) —
-    // hier NICHT zusätzlich mit 3.6 umrechnen.
-    setText("chipWind", Math.round(current.wind_speed_10m) + " km/h");
-    setText("chipGust", Math.round(current.wind_gusts_10m) + " km/h");
-    setText("chipHumidity", Math.round(current.relative_humidity_2m) + " %");
-    setText("chipPressure", Math.round(current.surface_pressure) + " hPa");
-    setText("chipPrecip", (current.precipitation ?? 0).toFixed(1) + " mm");
-    setText("chipUV", Number(current.uv_index ?? 0).toFixed(1));
-    setText("chipSun", `${formatClock(data.daily.sunrise[0])} · ${formatClock(data.daily.sunset[0])}`);
-
-    renderForecast(data.daily);
-    markUpdated("weatherStatus");
-
-    // 24-Stunden-Verlauf: die nächsten 24 Stundenwerte ab jetzt.
-    const nowMs = Date.now();
-    const upcoming = data.hourly.time
-      .map((time, index) => ({ time, index }))
-      .filter(({ time }) => new Date(time).getTime() >= nowMs)
-      .slice(0, 24);
-
-    if (upcoming.length > 0) {
-      const values = upcoming.map(({ index }) => data.hourly.temperature_2m[index]);
-      const labels = upcoming.map(({ time }) => time);
-      registerChart("weather", $("weatherChart"), $("chartTooltip"), () =>
-        drawLineChart($("weatherChart"), $("chartTooltip"), values, labels, {
-          id: "weather",
-          color: "var(--series-weather)",
-          unitShort: "°",
-          yTicks: 2,
-          xLabelCount: 3,
-          nowLabelId: "chartNow",
-          valueFormatter: (v) => Math.round(v) + "°C",
-          labelFormatter: (t) => formatClock(t),
-          xLabelFormatter: (t) => formatClock(t),
-        })
-      );
-      charts.weather.draw();
-    }
+    lastWeatherPayload = await response.json();
+    renderWeather();
   } catch (error) {
     console.error(error);
-    setText("description", "Wetterdaten nicht verfügbar");
-    setText("weatherStatus", "Fehler beim Laden");
+    setText("description", t("noData"));
+    setText("weatherStatus", t("noData"));
   }
+}
+
+function renderWeather() {
+  const data = lastWeatherPayload;
+  if (!data) return;
+  const current = data.current;
+  const code = current.weather_code;
+
+  setText("temperature", Math.round(current.temperature_2m) + "°");
+  setText("description", weatherLabel(code));
+  setText("tempMin", Math.round(data.daily.temperature_2m_min[0]) + "°");
+  setText("tempMax", Math.round(data.daily.temperature_2m_max[0]) + "°");
+
+  const heroIcon = $("heroIcon");
+  if (heroIcon) heroIcon.innerHTML = `<use href="#i-${iconFor(code)}"/>`;
+
+  // Open-Meteo liefert Windwerte standardmäßig bereits in km/h (kein m/s) —
+  // hier NICHT zusätzlich mit 3.6 umrechnen.
+  setText("chipWind", Math.round(current.wind_speed_10m) + " km/h");
+  setText("chipGust", Math.round(current.wind_gusts_10m) + " km/h");
+  setText("chipHumidity", Math.round(current.relative_humidity_2m) + " %");
+  setText("chipPressure", Math.round(current.surface_pressure) + " hPa");
+  setText("chipPrecip", (current.precipitation ?? 0).toFixed(1) + " mm");
+  setText("chipUV", Number(current.uv_index ?? 0).toFixed(1));
+  setText("chipSun", `${formatClock(data.daily.sunrise[0])} · ${formatClock(data.daily.sunset[0])}`);
+
+  renderForecast(data.daily);
+  markUpdated("weatherStatus");
+
+  speechState.temp = Math.round(current.temperature_2m);
+  speechState.cond = weatherLabel(code).toLowerCase();
+
+  // 24-Stunden-Verlauf: die nächsten 24 Stundenwerte ab jetzt.
+  const nowMs = Date.now();
+  const upcoming = data.hourly.time
+    .map((time, index) => ({ time, index }))
+    .filter(({ time }) => new Date(time).getTime() >= nowMs)
+    .slice(0, 24);
+
+  if (upcoming.length > 0) {
+    const values = upcoming.map(({ index }) => data.hourly.temperature_2m[index]);
+    const labels = upcoming.map(({ time }) => time);
+    registerChart("weather", $("weatherChart"), $("chartTooltip"), () =>
+      drawLineChart($("weatherChart"), $("chartTooltip"), values, labels, {
+        id: "weather",
+        color: "var(--series-weather)",
+        unitShort: "°",
+        yTicks: 2,
+        xLabelCount: 3,
+        nowLabelId: "chartNow",
+        valueFormatter: (v) => Math.round(v) + "°C",
+        labelFormatter: (time) => formatClock(time),
+        xLabelFormatter: (time) => formatClock(time),
+      })
+    );
+    charts.weather.draw();
+  }
+
+  if (openDayIndex != null) openDayDetail(openDayIndex);
 }
 
 function renderForecast(daily) {
@@ -351,11 +364,11 @@ function renderForecast(daily) {
     return {
       date,
       dateStr,
-      dayLabel: i === 0 ? "Heute" : WEEKDAYS[date.getDay()],
-      weekdayLong: WEEKDAYS_LONG[date.getDay()],
+      isToday: i === 0,
+      dayLabel: i === 0 ? t("today") : weekday(date.getDay()),
+      weekdayIndex: date.getDay(),
       code: daily.weather_code[i],
       icon: iconFor(daily.weather_code[i]),
-      condLabel: labelFor(daily.weather_code[i]),
       hi: Math.round(daily.temperature_2m_max[i]),
       lo: Math.round(daily.temperature_2m_min[i]),
       precipSum: daily.precipitation_sum[i],
@@ -391,9 +404,13 @@ function openDayDetail(index) {
   if (!d) return;
   const modal = $("dayModal");
   if (!modal) return;
+  openDayIndex = index;
 
-  setText("dayModalDate", `${d.dayLabel === "Heute" ? "Heute · " : ""}${d.weekdayLong}, ${d.date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`);
-  setText("dayModalCond", d.condLabel);
+  setText(
+    "dayModalDate",
+    `${d.isToday ? t("today") + " · " : ""}${weekdayLong(d.weekdayIndex)}, ${d.date.toLocaleDateString(locale(), { day: "2-digit", month: "2-digit", year: "numeric" })}`
+  );
+  setText("dayModalCond", weatherLabel(d.code));
   setText("dayModalHi", d.hi + "°");
   setText("dayModalLo", d.lo + "°");
   setText("dayModalPrecip", d.precipSum.toFixed(1) + " mm");
@@ -414,9 +431,12 @@ function closeDayDetail() {
   const modal = $("dayModal");
   if (modal) modal.hidden = true;
   document.body.classList.remove("modal-open");
+  openDayIndex = null;
 }
 
 // ---------- Brände (14-Tage-Verlauf, Feuerwehr Berlin) ----------
+
+let lastFireRows = null;
 
 function formatDateKey(date) {
   const year = date.getFullYear();
@@ -428,13 +448,13 @@ function formatDateKey(date) {
 function formatDisplayDate(dateString) {
   const date = new Date(dateString + "T00:00:00");
   if (Number.isNaN(date.getTime())) return dateString;
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return date.toLocaleDateString(locale(), { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function formatShortDate(dateString) {
   const date = new Date(dateString + "T00:00:00");
   if (Number.isNaN(date.getTime())) return dateString;
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  return date.toLocaleDateString(locale(), { day: "2-digit", month: "2-digit" });
 }
 
 function parseFireCsv(csvText) {
@@ -477,80 +497,9 @@ async function loadFireCount() {
     const response = await fetch(FIRE_DATA_URL);
     if (!response.ok) throw new Error("Feuerstatistik nicht erreichbar");
     const csvText = await response.text();
-    const rows = parseFireCsv(csvText);
-    if (!rows.length) throw new Error("Keine Einträge in der Feuerstatistik");
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = formatDateKey(yesterday);
-
-    // Nur vollständige Tage bis (einschließlich) gestern berücksichtigen,
-    // damit kein unvollständiger "heute"-Datensatz den Verlauf verfälscht.
-    const completeRows = rows.filter((r) => r.date <= yesterdayKey);
-    const last14 = completeRows.slice(-14);
-    const latest = last14[last14.length - 1] || rows[rows.length - 1];
-
-    setText("fireCount", Math.round(latest.fireCount));
-    setText("fireDate", formatDisplayDate(latest.date));
-    setText("fireDate2", formatDisplayDate(latest.date));
-
-    if (last14.length) {
-      registerChart("fire", $("fireChart"), $("fireTooltip"), () =>
-        drawBarChart(
-          $("fireChart"),
-          $("fireTooltip"),
-          last14.map((r) => r.fireCount),
-          last14.map((r) => r.date),
-          {
-            color: "var(--series-fire)",
-            highlightColor: "var(--series-fire)",
-            valueFormatter: (v) => Math.round(v) + " Brände",
-            labelFormatter: (d) => formatDisplayDate(d),
-            xLabelFirst: true,
-            xLabelFormatter: (d) => formatShortDate(d),
-          }
-        )
-      );
-      charts.fire.draw();
-    }
-
-    // Gesamteinsätze (alle Kategorien: Rettungsdienst, Brände, technische
-    // Hilfe, …) am selben Tag wie oben — eine einfache zusätzliche Kennzahl.
-    if (latest.missionsAll != null) {
-      setText("totalMissionsValue", Math.round(latest.missionsAll).toLocaleString("de-DE"));
-    } else {
-      setText("totalMissionsValue", "--");
-    }
-
-    // Ø Reaktionszeit (Eintreffzeit erstes Löschfahrzeug) über die letzten
-    // 30 vollständigen Tage — "des letzten Monats".
-    const last30 = completeRows.slice(-30).filter((r) => r.responseTimeMin != null);
-    if (last30.length) {
-      const avgMin = last30.reduce((sum, r) => sum + r.responseTimeMin, 0) / last30.length;
-      setText("respTimeValue", avgMin.toLocaleString("de-DE", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + " Min");
-
-      registerChart("respTime", $("respTimeChart"), $("respTimeTooltip"), () =>
-        drawLineChart(
-          $("respTimeChart"),
-          $("respTimeTooltip"),
-          last30.map((r) => r.responseTimeMin),
-          last30.map((r) => r.date),
-          {
-            id: "resptime",
-            color: "var(--series-fire)",
-            grid: false,
-            padding: { top: 6, right: 4, bottom: 16, left: 4 },
-            xLabelCount: 2,
-            valueFormatter: (v) => v.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " Min",
-            labelFormatter: (d) => formatDisplayDate(d),
-            xLabelFormatter: (d) => formatShortDate(d),
-          }
-        )
-      );
-      charts.respTime.draw();
-    } else {
-      setText("respTimeValue", "--");
-    }
+    lastFireRows = parseFireCsv(csvText);
+    if (!lastFireRows.length) throw new Error("Keine Einträge in der Feuerstatistik");
+    renderFire();
   } catch (error) {
     console.error(error);
     setText("fireCount", "--");
@@ -560,7 +509,87 @@ async function loadFireCount() {
   }
 }
 
+function renderFire() {
+  const rows = lastFireRows;
+  if (!rows || !rows.length) return;
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = formatDateKey(yesterday);
+
+  // Nur vollständige Tage bis (einschließlich) gestern berücksichtigen,
+  // damit kein unvollständiger "heute"-Datensatz den Verlauf verfälscht.
+  const completeRows = rows.filter((r) => r.date <= yesterdayKey);
+  const last14 = completeRows.slice(-14);
+  const latest = last14[last14.length - 1] || rows[rows.length - 1];
+
+  setText("fireCount", Math.round(latest.fireCount));
+  setText("fireDate", formatDisplayDate(latest.date));
+  setText("fireDate2", formatDisplayDate(latest.date));
+  speechState.fireCount = Math.round(latest.fireCount);
+
+  if (last14.length) {
+    registerChart("fire", $("fireChart"), $("fireTooltip"), () =>
+      drawBarChart(
+        $("fireChart"),
+        $("fireTooltip"),
+        last14.map((r) => r.fireCount),
+        last14.map((r) => r.date),
+        {
+          color: "var(--series-fire)",
+          highlightColor: "var(--series-fire)",
+          valueFormatter: (v) => Math.round(v) + " " + t("unitEinsaetze"),
+          labelFormatter: (d) => formatDisplayDate(d),
+          xLabelFirst: true,
+          xLabelFormatter: (d) => formatShortDate(d),
+        }
+      )
+    );
+    charts.fire.draw();
+  }
+
+  // Gesamteinsätze (alle Kategorien: Rettungsdienst, Brände, technische
+  // Hilfe, …) am selben Tag wie oben — eine einfache zusätzliche Kennzahl.
+  if (latest.missionsAll != null) {
+    setText("totalMissionsValue", Math.round(latest.missionsAll).toLocaleString(locale()));
+  } else {
+    setText("totalMissionsValue", "--");
+  }
+
+  // Ø Reaktionszeit (Eintreffzeit erstes Löschfahrzeug) über die letzten
+  // 30 vollständigen Tage — "des letzten Monats".
+  const last30 = completeRows.slice(-30).filter((r) => r.responseTimeMin != null);
+  if (last30.length) {
+    const avgMin = last30.reduce((sum, r) => sum + r.responseTimeMin, 0) / last30.length;
+    setText("respTimeValue", avgMin.toLocaleString(locale(), { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + " min");
+
+    registerChart("respTime", $("respTimeChart"), $("respTimeTooltip"), () =>
+      drawLineChart(
+        $("respTimeChart"),
+        $("respTimeTooltip"),
+        last30.map((r) => r.responseTimeMin),
+        last30.map((r) => r.date),
+        {
+          id: "resptime",
+          color: "var(--series-fire)",
+          grid: false,
+          padding: { top: 6, right: 4, bottom: 16, left: 4 },
+          xLabelCount: 2,
+          valueFormatter: (v) => v.toLocaleString(locale(), { maximumFractionDigits: 1 }) + " min",
+          labelFormatter: (d) => formatDisplayDate(d),
+          xLabelFormatter: (d) => formatShortDate(d),
+        }
+      )
+    );
+    charts.respTime.draw();
+  } else {
+    setText("respTimeValue", "--");
+  }
+}
+
 // ---------- Pegelstand Spree · Berlin-Köpenick (PEGELONLINE / WSV) ----------
+
+let lastPegelSeries = null;
 
 async function loadPegel() {
   try {
@@ -568,53 +597,65 @@ async function loadPegel() {
     if (!res.ok) throw new Error("Pegeldaten nicht erreichbar");
     const series = await res.json();
     if (!series.length) throw new Error("Keine Pegeldaten");
-
-    const latest = series[series.length - 1];
-    setText("pegelValue", Math.round(latest.value) + " cm");
-    setText("pegelTime", "Stand " + formatClock(latest.timestamp));
-
-    // Tendenz aus den letzten ~3h (12 Messpunkte à 15 Min.) ableiten.
-    const window = series.slice(-12);
-    const diff = latest.value - window[0].value;
-    const trend = diff >= 1 ? "steigend" : diff <= -1 ? "fallend" : "stabil";
-    setText("pegelTrend", "Tendenz " + trend);
-
-    registerChart("pegel", $("pegelChart"), $("pegelTooltip"), () =>
-      drawLineChart(
-        $("pegelChart"),
-        $("pegelTooltip"),
-        series.map((p) => p.value),
-        series.map((p) => p.timestamp),
-        {
-          id: "pegel",
-          color: "var(--series-pegel)",
-          grid: false,
-          padding: { top: 8, right: 4, bottom: 16, left: 4 },
-          xLabelCount: 3,
-          valueFormatter: (v) => Math.round(v) + " cm",
-          labelFormatter: (t) => new Date(t).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + " " + formatClock(t),
-          xLabelFormatter: (t) => new Date(t).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
-        }
-      )
-    );
-    charts.pegel.draw();
+    lastPegelSeries = series;
+    renderPegel();
   } catch (error) {
     console.error(error);
     setText("pegelValue", "--");
-    setText("pegelTrend", "Keine Daten");
+    setText("pegelTrend", t("noData"));
   }
+}
+
+function renderPegel() {
+  const series = lastPegelSeries;
+  if (!series || !series.length) return;
+
+  const latest = series[series.length - 1];
+  setText("pegelValue", Math.round(latest.value) + " cm");
+  setText("pegelTime", t("standPrefix") + " " + formatClock(latest.timestamp));
+
+  // Tendenz aus den letzten ~3h (12 Messpunkte à 15 Min.) ableiten.
+  const recentWindow = series.slice(-12);
+  const diff = latest.value - recentWindow[0].value;
+  const trendKey = diff >= 1 ? "steigend" : diff <= -1 ? "fallend" : "stabil";
+  setText("pegelTrend", t("trendPrefix") + " " + trendLabel(trendKey));
+
+  speechState.pegel = Math.round(latest.value);
+  speechState.trend = trendLabel(trendKey);
+
+  registerChart("pegel", $("pegelChart"), $("pegelTooltip"), () =>
+    drawLineChart(
+      $("pegelChart"),
+      $("pegelTooltip"),
+      series.map((p) => p.value),
+      series.map((p) => p.timestamp),
+      {
+        id: "pegel",
+        color: "var(--series-pegel)",
+        grid: false,
+        padding: { top: 8, right: 4, bottom: 16, left: 4 },
+        xLabelCount: 3,
+        valueFormatter: (v) => Math.round(v) + " cm",
+        labelFormatter: (time) => new Date(time).toLocaleDateString(locale(), { day: "2-digit", month: "2-digit" }) + " " + formatClock(time),
+        xLabelFormatter: (time) => new Date(time).toLocaleDateString(locale(), { day: "2-digit", month: "2-digit" }),
+      }
+    )
+  );
+  charts.pegel.draw();
 }
 
 // ---------- Luftqualität (Open-Meteo Air Quality) ----------
 // Rauch von Bränden kann die Luftqualität verschlechtern — daher als eigene
-// Kachel neben Bränden und Pegel sinnvoll für die Lagebeurteilung.
+// Anzeige neben Bränden und Pegel sinnvoll für die Lagebeurteilung.
 
-function aqiStatus(eaqi) {
-  if (eaqi == null) return { label: "Keine Daten", cls: "" };
-  if (eaqi <= 20) return { label: "Gut", cls: "aqi-good" };
-  if (eaqi <= 40) return { label: "Mäßig", cls: "aqi-warning" };
-  if (eaqi <= 60) return { label: "Schlecht", cls: "aqi-serious" };
-  return { label: "Sehr schlecht", cls: "aqi-critical" };
+let lastAqiPayload = null;
+
+function aqiStatusKey(eaqi) {
+  if (eaqi == null) return null;
+  if (eaqi <= 20) return "good";
+  if (eaqi <= 40) return "warning";
+  if (eaqi <= 60) return "serious";
+  return "critical";
 }
 
 async function loadAirQuality() {
@@ -622,31 +663,146 @@ async function loadAirQuality() {
     const url = `${AIR_QUALITY_URL}?latitude=${BERLIN_LAT}&longitude=${BERLIN_LON}&current=pm10,pm2_5,european_aqi&timezone=Europe%2FBerlin`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("Luftqualitätsdaten nicht erreichbar");
-    const data = await res.json();
-    const c = data.current;
-    const status = aqiStatus(c.european_aqi);
-
-    const valueEl = $("aqiValue");
-    if (valueEl) {
-      valueEl.textContent = status.label;
-      valueEl.className = "v " + status.cls;
-    }
-    const iconEl = $("aqiIcon");
-    if (iconEl) iconEl.setAttribute("class", "ic " + status.cls);
-
-    setText("aqiDetail", `PM2.5 ${c.pm2_5.toFixed(1)} · PM10 ${c.pm10.toFixed(1)} µg/m³`);
-    setText("aqiSub", `Europäischer Luftqualitätsindex ${Math.round(c.european_aqi)}`);
+    lastAqiPayload = await res.json();
+    renderAqi();
   } catch (error) {
     console.error(error);
     setText("aqiValue", "--");
-    setText("aqiDetail", "Keine Daten");
+    setText("aqiDetail", t("noData"));
   }
 }
 
-// ---------- Warnungen-Modal ----------
-// Die Warnungen selbst werden bereits beim Bauen der Seite serverseitig
-// geladen und fertig ins HTML gerendert (siehe index.astro) — hier wird nur
-// noch geöffnet/geschlossen.
+function renderAqi() {
+  const data = lastAqiPayload;
+  if (!data) return;
+  const c = data.current;
+  const key = aqiStatusKey(c.european_aqi);
+  const cls = key ? "aqi-" + key : "";
+  const label = key ? aqiLabel(key) : t("noData");
+
+  const valueEl = $("aqiValue");
+  if (valueEl) {
+    valueEl.textContent = label;
+    valueEl.className = "v " + cls;
+  }
+  const iconEl = $("aqiIcon");
+  if (iconEl) iconEl.setAttribute("class", "ic " + cls);
+
+  setText("aqiDetail", `PM2.5 ${c.pm2_5.toFixed(1)} · PM10 ${c.pm10.toFixed(1)} µg/m³`);
+  speechState.aqi = label.toLowerCase();
+}
+
+// ---------- Warnungen ----------
+// Die Warnungen selbst kommen bereits mehrsprachig (de/en/fr/pl/es) vom Bund
+// und wurden beim Bauen der Seite serverseitig geladen (siehe index.astro,
+// die dortige API hat kein CORS). Sie stehen als JSON im Dokument und werden
+// hier komplett client-seitig gerendert — genau wie die Tages-Vorhersage,
+// damit ein Sprachwechsel ohne neuen Netzwerk-Request funktioniert.
+
+let warningsPayload = { warnings: [], warningsError: false, buildStamp: null };
+
+function loadWarningsData() {
+  const el = $("warnings-data");
+  if (!el) return;
+  try {
+    warningsPayload = JSON.parse(el.textContent);
+  } catch (error) {
+    console.error("Warnungen-Daten konnten nicht gelesen werden:", error);
+  }
+}
+
+function warningLang(w) {
+  return w.langs[getLang()] || w.langs.de;
+}
+
+function formatWarnTime(iso) {
+  if (!iso) return "–";
+  return (
+    new Date(iso).toLocaleString(locale(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
+    (t("clockSuffix") ? " " + t("clockSuffix") : "")
+  );
+}
+
+function renderWarningsTile() {
+  const { warnings, warningsError } = warningsPayload;
+  const statusKey = warningsError ? null : warnings.length > 0 ? severityToAqiKey(warnings[0].severity) : "good";
+
+  const valueEl = document.querySelector("#warningsOpen .v");
+  if (valueEl) {
+    valueEl.textContent = warningsError ? t("noData") : warnings.length > 0 ? `${warnings.length} ${t("warnActiveSuffix")}` : t("warnNoneActive");
+    valueEl.className = "v " + (statusKey ? "aqi-" + statusKey : "");
+  }
+
+  const subEls = document.querySelectorAll("#warningsOpen .sub");
+  if (subEls[0]) subEls[0].textContent = warningsError ? t("warnSubError") : t("warnSubOk");
+
+  const preview = document.querySelector("#warningsOpen .warn-preview");
+  if (preview) {
+    if (warningsError) {
+      preview.innerHTML = `<p>${t("warnPreviewError")}</p>`;
+    } else if (warnings.length === 0) {
+      preview.innerHTML = `<p>${t("warnPreviewEmpty")}</p>`;
+    } else {
+      preview.innerHTML = warnings
+        .slice(0, 3)
+        .map((w) => `<p class="warn-preview-item"><span class="warn-dot aqi-${severityToAqiKey(w.severity)}"></span>${warningLang(w).headline}</p>`)
+        .join("");
+    }
+  }
+
+  if (subEls[1]) subEls[1].textContent = t("detailsView");
+}
+
+function severityToAqiKey(severity) {
+  if (severity === "Extreme") return "critical";
+  if (severity === "Severe") return "serious";
+  if (severity === "Moderate") return "warning";
+  return "good";
+}
+
+function renderWarningsModal() {
+  const { warnings, warningsError, buildStamp } = warningsPayload;
+  const title = $("warnModalTitle");
+  if (title) title.textContent = t("warnModalTitle");
+
+  const body = $("warnModalBody");
+  if (!body) return;
+
+  if (warningsError) {
+    body.innerHTML = `<p class="warn-empty">${t("warnModalError")}</p>`;
+  } else if (warnings.length === 0) {
+    body.innerHTML = `<p class="warn-empty">${t("warnPreviewEmpty")}</p>`;
+  } else {
+    body.innerHTML = `<div class="warn-list">${warnings
+      .map((w) => {
+        const info = warningLang(w);
+        const cls = "aqi-" + severityToAqiKey(w.severity);
+        return `
+          <article class="warn-card">
+            <div class="warn-card-head">
+              <span class="warn-badge ${cls}">${severityLabel(w.severity)}</span>
+              <span class="warn-time">${t("validUntil")} ${formatWarnTime(w.expires)}</span>
+            </div>
+            <h3>${info.headline}</h3>
+            ${info.description ? `<p class="warn-desc">${info.description}</p>` : ""}
+            ${info.instruction ? `<p class="warn-instr">${info.instruction}</p>` : ""}
+            <p class="warn-meta">${info.senderName}${w.areaDesc ? ` · ${w.areaDesc}` : ""}</p>
+          </article>`;
+      })
+      .join("")}</div>`;
+  }
+
+  const footnote = $("warnFootnote");
+  if (footnote) {
+    const stamp = buildStamp
+      ? new Date(buildStamp).toLocaleString(locale(), { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "–";
+    footnote.innerHTML = `${t("warnSource")} · ${t("buildStandLabel")}: ${stamp}`;
+  }
+
+  speechState.warnCount = warningsError ? 0 : warnings.length;
+  speechState.warnHeadline = warnings.length > 0 ? warningLang(warnings[0]).headline : "";
+}
 
 function openWarnings() {
   const modal = $("warnModal");
@@ -680,6 +836,114 @@ function closeHazardMap() {
   document.body.classList.remove("modal-open");
 }
 
+// ---------- Barrierefreiheit: Sprache, Farbenblind-Modus, Vorlesen ----------
+
+function renderDynamicTexts() {
+  // Alles neu rendern, was aus zwischengespeicherten Rohdaten zusammengesetzt
+  // wird — ohne erneuten Netzwerk-Request, das reicht für einen Sprachwechsel.
+  applyStaticTranslations();
+  if (lastWeatherPayload) renderWeather();
+  if (lastFireRows) renderFire();
+  if (lastPegelSeries) renderPegel();
+  if (lastAqiPayload) renderAqi();
+  renderWarningsTile();
+  renderWarningsModal();
+  updateClock();
+  redrawAllCharts();
+}
+
+function setupA11yPanel() {
+  const openBtn = $("a11yOpen");
+  const panel = $("a11yPanel");
+  const backdrop = $("a11yPanelBackdrop");
+  const closeBtn = $("a11yPanelClose");
+
+  const open = () => {
+    if (!panel) return;
+    panel.hidden = false;
+    document.body.classList.add("modal-open");
+    closeBtn?.focus();
+  };
+  const close = () => {
+    if (panel) panel.hidden = true;
+    document.body.classList.remove("modal-open");
+  };
+
+  openBtn?.addEventListener("click", open);
+  closeBtn?.addEventListener("click", close);
+  backdrop?.addEventListener("click", close);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && panel && !panel.hidden) close();
+  });
+
+  document.querySelectorAll(".lang-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setLang(btn.dataset.lang);
+      document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("is-active", b === btn));
+      renderDynamicTexts();
+    });
+  });
+  document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.lang === getLang()));
+
+  const cbToggle = $("colorblindToggle");
+  if (cbToggle) {
+    cbToggle.checked = getColorblind();
+    cbToggle.addEventListener("change", () => setColorblind(cbToggle.checked));
+  }
+
+  setupSpeech();
+}
+
+// ---------- Text-to-Speech (Web Speech API) ----------
+
+let currentUtterance = null;
+
+function buildSpeechText() {
+  const parts = [speech("intro")];
+  if (speechState.temp != null) parts.push(speech("temp", speechState.temp, speechState.cond || ""));
+  if (speechState.pegel != null) parts.push(speech("pegel", speechState.pegel, speechState.trend || ""));
+  if (speechState.fireCount != null) parts.push(speech("fire", speechState.fireCount));
+  if (speechState.aqi) parts.push(speech("aqi", speechState.aqi));
+  if (speechState.warnCount === 0) parts.push(speech("warnNone"));
+  else if (speechState.warnCount > 0) parts.push(speech("warnSome", speechState.warnCount, speechState.warnHeadline));
+  return parts.filter(Boolean).join(" ");
+}
+
+function setupSpeech() {
+  const btn = $("speakBtn");
+  if (!btn) return;
+
+  if (!("speechSynthesis" in window)) {
+    btn.disabled = true;
+    btn.title = t("a11ySpeakUnsupported");
+    return;
+  }
+
+  btn.addEventListener("click", () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setSpeakButtonState(false);
+      return;
+    }
+    const text = buildSpeechText();
+    if (!text) return;
+    currentUtterance = new SpeechSynthesisUtterance(text);
+    currentUtterance.lang = locale();
+    currentUtterance.onend = () => setSpeakButtonState(false);
+    currentUtterance.onerror = () => setSpeakButtonState(false);
+    setSpeakButtonState(true);
+    window.speechSynthesis.speak(currentUtterance);
+  });
+}
+
+function setSpeakButtonState(speaking) {
+  const btn = $("speakBtn");
+  const label = $("speakBtnLabel");
+  if (!btn) return;
+  btn.classList.toggle("is-speaking", speaking);
+  if (label) label.textContent = speaking ? t("a11ySpeakStop") : t("a11ySpeak");
+}
+
 // ---------- Start ----------
 
 function refreshAll() {
@@ -688,6 +952,13 @@ function refreshAll() {
   loadPegel();
   loadAirQuality();
 }
+
+initLang();
+document.documentElement.toggleAttribute("data-colorblind", getColorblind());
+loadWarningsData();
+applyStaticTranslations();
+renderWarningsTile();
+renderWarningsModal();
 
 $("dayModalClose")?.addEventListener("click", closeDayDetail);
 $("dayModalBackdrop")?.addEventListener("click", closeDayDetail);
@@ -703,6 +974,8 @@ document.addEventListener("keydown", (e) => {
   if (!$("warnModal")?.hidden) closeWarnings();
   if (!$("hazardModal")?.hidden) closeHazardMap();
 });
+
+setupA11yPanel();
 
 window.addEventListener("resize", debounce(redrawAllCharts, 150));
 
