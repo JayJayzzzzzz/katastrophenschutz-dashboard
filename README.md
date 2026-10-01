@@ -104,18 +104,350 @@ Ein konkreter, dokumentierter Sonderfall:
 
 ## Projekt lokal ausführen
 
-```sh
-npm install
-npm run dev       # Entwicklungsserver, http://localhost:4321/katastrophenschutz-dashboard/
-npm run build     # Produktions-Build nach ./dist
-npm run preview   # Produktions-Build lokal testen
+Diese Anleitung ist für Einsteiger gedacht. Es werden keine Vorkenntnisse vorausgesetzt.
+
+**Ergebnis:** Das Dashboard läuft lokal unter:
+
+```text
+http://localhost:4321/katastrophenschutz-dashboard/
 ```
 
-Zum lokalen Testen der Warnungen-Kachel mit einer Beispielwarnung (die echte
-NINA-API zeigt meist "keine aktiven Warnungen"):
+**Dauer:** ca. 10–15 Minuten
 
-```sh
+---
+
+## 1. Terminal öffnen
+
+### Windows
+
+PowerShell öffnen:
+
+```text
+Startmenü → PowerShell
+```
+
+### macOS
+
+```text
+Cmd + Leertaste → Terminal
+```
+
+### Linux
+
+```text
+Strg + Alt + T
+```
+
+---
+
+## 2. Node.js installieren
+
+Für dieses Projekt wird **Node.js 22.12 oder neuer** benötigt.
+
+### Windows
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+### macOS
+
+Falls Homebrew noch nicht installiert ist:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Danach:
+
+```bash
+brew install node
+```
+
+### Linux
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+```
+
+Terminal neu öffnen und anschließend:
+
+```bash
+nvm install --lts
+```
+
+---
+
+## Installation prüfen
+
+```bash
+node --version
+npm --version
+```
+
+Die Node-Version sollte mindestens **v22.12.0** sein.
+
+---
+
+## 3. Projekt entpacken
+
+### Windows
+
+```powershell
+cd $HOME\Downloads
+Expand-Archive projekt.zip .
+```
+
+### macOS / Linux
+
+```bash
+cd ~/Downloads
+unzip projekt.zip
+```
+
+Danach in den Projektordner wechseln:
+
+```bash
+cd ordnername
+```
+
+Prüfen:
+
+```bash
+ls
+```
+
+oder unter Windows:
+
+```powershell
+dir
+```
+
+Folgende Dateien sollten sichtbar sein:
+
+```text
+package.json
+README.md
+src
+```
+
+---
+
+## 4. Abhängigkeiten installieren
+
+Einmalig ausführen:
+
+```bash
+npm install
+```
+
+Dabei werden alle benötigten Bibliotheken installiert.
+
+---
+
+## 5. Entwicklungsserver starten
+
+```bash
+npm run dev
+```
+
+Danach im Browser öffnen:
+
+```text
+http://localhost:4321/katastrophenschutz-dashboard/
+```
+
+**Wichtig:** Der Teil
+
+```text
+/katastrophenschutz-dashboard/
+```
+
+muss Bestandteil der URL sein.
+
+Das Terminal muss geöffnet bleiben.
+
+Beenden:
+
+```text
+Strg + C
+```
+
+---
+
+## 6. Produktions-Build testen (zum lokalen Testen nicht notwendig)
+
+```bash
+npm run build
+npm run preview
+```
+
+- `npm run build` erstellt die fertige Version im Ordner `dist`
+- `npm run preview` startet diese lokal
+
+---
+
+## Beispielwarnung anzeigen
+
+Da häufig keine echte Warnung aktiv ist, kann eine Testwarnung eingeblendet werden.
+
+### macOS / Linux
+
+```bash
 DASHBOARD_TEST_WARNING=1 npm run build && npm run preview
+```
+
+### Windows (Eingabeaufforderung)
+
+```cmd
+set DASHBOARD_TEST_WARNING=1 && npm run build && npm run preview
+```
+
+### Windows (PowerShell)
+
+```powershell
+$env:DASHBOARD_TEST_WARNING=1
+npm run build
+npm run preview
+```
+
+---
+
+# Häufige Probleme
+
+## Node oder npm wird nicht gefunden
+
+Node.js ist nicht korrekt installiert oder das Terminal wurde vor der Installation geöffnet.
+
+**Lösung:**
+
+- Terminal schließen
+- Neues Terminal öffnen
+- Installation erneut prüfen
+
+---
+
+## PowerShell meldet „Ausführung von Skripts ist deaktiviert“
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Danach PowerShell neu starten.
+
+---
+
+## winget wird nicht gefunden
+
+- Microsoft App Installer aktualisieren
+- Alternativ Node.js manuell installieren
+
+---
+
+## Node-Version zu alt
+
+### Windows
+
+```powershell
+winget upgrade OpenJS.NodeJS.LTS
+```
+
+### macOS
+
+```bash
+brew upgrade node
+```
+
+### Linux
+
+```bash
+nvm install --lts
+```
+
+---
+
+## package.json wird nicht gefunden
+
+Du befindest dich im falschen Ordner.
+
+Mit `cd` in den Projektordner wechseln.
+
+---
+
+## 404 oder leere Seite
+
+Die URL muss mit folgendem Pfad enden:
+
+```text
+/katastrophenschutz-dashboard/
+```
+
+---
+
+## Port 4321 wird bereits verwendet
+
+Ein anderer Dev-Server läuft bereits.
+
+**Lösung:**
+
+```text
+Strg + C
+```
+
+im alten Terminalfenster.
+
+---
+
+## Daten-Kacheln bleiben leer
+
+Internetverbindung prüfen.
+
+Einige Schulnetzwerke blockieren bestimmte Schnittstellen.
+
+---
+
+## Keine aktiven Warnungen
+
+Das ist normal.
+
+Zum Testen kann die Beispielwarnung verwendet werden.
+
+---
+
+## npm install zeigt Warnungen
+
+Meldungen wie
+
+```text
+warn
+deprecated
+```
+
+sind meist unkritisch.
+
+Relevante Fehler beginnen typischerweise mit:
+
+```text
+ERR!
+error
+```
+
+---
+
+## Kurzfassung
+
+```bash
+# Einmalig
+npm install
+
+# Dashboard starten
+npm run dev
+```
+
+Danach im Browser öffnen:
+
+```text
+http://localhost:4321/katastrophenschutz-dashboard/
 ```
 
 ## Deployment (GitHub Pages)
