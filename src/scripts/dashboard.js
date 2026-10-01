@@ -6,7 +6,7 @@
 import {
   getLang, setLang, initLang, locale, t, weatherLabel, weekday, weekdayLong,
   trendLabel, aqiLabel, severityLabel, speech, applyStaticTranslations,
-  getHighContrast, setHighContrast,
+  getHighContrast, setHighContrast, getTheme, setTheme, initTheme,
 } from "./i18n.js";
 
 const BERLIN_LAT = 52.52;
@@ -88,12 +88,34 @@ function markUpdated(elId) {
 
 const charts = {}; // name -> { svg, tooltip, draw: fn() }
 
+function chartLabelFontSize() {
+  return window.matchMedia("(min-width: 1800px) and (min-height: 1000px)").matches ? 14 : 10.5;
+}
+
 function registerChart(name, svg, tooltip, drawFn) {
   charts[name] = { svg, tooltip, draw: drawFn };
 }
 
 function redrawAllCharts() {
   Object.values(charts).forEach((c) => c.draw());
+}
+
+function positionChartTooltip(tooltip, svg, anchorX, anchorY) {
+  const container = tooltip.offsetParent || svg.parentElement;
+  if (!container) return;
+
+  const inset = 8;
+  const gap = 8;
+  const maxLeft = Math.max(inset, container.clientWidth - tooltip.offsetWidth - inset);
+  const left = Math.max(inset, Math.min(anchorX - tooltip.offsetWidth / 2, maxLeft));
+  const maxTop = Math.max(inset, container.clientHeight - tooltip.offsetHeight - inset);
+  const above = anchorY - tooltip.offsetHeight - gap;
+  const below = anchorY + gap;
+  const top = above >= inset ? Math.min(above, maxTop) : Math.min(below, maxTop);
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+  tooltip.style.transform = "none";
 }
 
 function drawLineChart(svg, tooltip, values, labels, opts) {
@@ -105,7 +127,8 @@ function drawLineChart(svg, tooltip, values, labels, opts) {
   svg.removeAttribute("preserveAspectRatio");
 
   const color = opts.color;
-  const pad = opts.padding || { top: 10, right: 8, bottom: 20, left: 30 };
+  const labelFontSize = chartLabelFontSize();
+  const pad = opts.padding || { top: 10, right: 8, bottom: 20, left: labelFontSize > 12 ? 60 : 30 };
   const showGrid = opts.grid !== false;
   const nums = values.map(Number);
   const pad10 = Math.max((Math.max(...nums) - Math.min(...nums)) * 0.15, opts.minPad ?? 1.5);
@@ -128,7 +151,7 @@ function drawLineChart(svg, tooltip, values, labels, opts) {
       const y = yFor(value);
       return `
         <line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" stroke="var(--chart-grid)" stroke-width="1" />
-        ${opts.showYLabels === false ? "" : `<text x="2" y="${y + 4}" fill="var(--muted)" font-size="10.5">${Math.round(value)}${opts.unitShort || ""}</text>`}`;
+        ${opts.showYLabels === false ? "" : `<text x="${pad.left - 4}" y="${y + 4}" text-anchor="end" fill="var(--muted)" font-size="${labelFontSize}">${Math.round(value)}${opts.unitShort || ""}</text>`}`;
     }).join("");
   }
 
@@ -141,7 +164,7 @@ function drawLineChart(svg, tooltip, values, labels, opts) {
         // Am linken/rechten Rand nicht mittig verankern, sonst schneidet der
         // Container die Hälfte des Textes ab (besonders bei knappem Padding).
         const anchor = i === 0 ? "start" : i === nums.length - 1 ? "end" : "middle";
-        return `<text x="${xFor(i)}" y="${h - 5}" text-anchor="${anchor}" fill="var(--muted)" font-size="10.5">${opts.xLabelFormatter(labels[i])}</text>`;
+        return `<text x="${xFor(i)}" y="${h - 5}" text-anchor="${anchor}" fill="var(--muted)" font-size="${labelFontSize}">${opts.xLabelFormatter(labels[i])}</text>`;
       })
       .join("");
   }
@@ -155,7 +178,7 @@ function drawLineChart(svg, tooltip, values, labels, opts) {
     </defs>
     ${gridSvg}
     ${opts.fill !== false ? `<polygon points="${area}" fill="url(#grad-${opts.id})"></polygon>` : ""}
-    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="${labelFontSize > 12 ? 3.5 : 2.5}" stroke-linecap="round" stroke-linejoin="round"></polyline>
     ${xLabelsSvg}
   `;
 
@@ -186,8 +209,7 @@ function drawLineChart(svg, tooltip, values, labels, opts) {
       }
       tooltip.hidden = false;
       tooltip.textContent = `${opts.labelFormatter(closest.label)} · ${opts.valueFormatter(closest.v)}`;
-      tooltip.style.left = (closest.x / w) * rect.width + "px";
-      tooltip.style.top = (closest.y / h) * rect.height + "px";
+      positionChartTooltip(tooltip, svg, (closest.x / w) * rect.width, (closest.y / h) * rect.height);
     };
     svg.onpointerleave = () => {
       tooltip.hidden = true;
@@ -205,6 +227,7 @@ function drawBarChart(svg, tooltip, values, labels, opts) {
 
   const color = opts.color;
   const highlightColor = opts.highlightColor || color;
+  const labelFontSize = chartLabelFontSize();
   const pad = opts.padding || { top: 8, right: 4, bottom: 18, left: 4 };
   const nums = values.map(Number);
   const maxV = Math.max(...nums, 1) * 1.2;
@@ -232,8 +255,8 @@ function drawBarChart(svg, tooltip, values, labels, opts) {
       .join("")}
     ${
       opts.xLabelFirst
-        ? `<text x="${bars[0].x}" y="${h - 4}" fill="var(--muted)" font-size="10">${opts.xLabelFormatter(bars[0].label)}</text>
-           <text x="${bars[bars.length - 1].x + bars[bars.length - 1].w}" y="${h - 4}" text-anchor="end" fill="var(--muted)" font-size="10">${opts.xLabelFormatter(bars[bars.length - 1].label)}</text>`
+          ? `<text x="${bars[0].x}" y="${h - 4}" fill="var(--muted)" font-size="${labelFontSize}">${opts.xLabelFormatter(bars[0].label)}</text>
+            <text x="${bars[bars.length - 1].x + bars[bars.length - 1].w}" y="${h - 4}" text-anchor="end" fill="var(--muted)" font-size="${labelFontSize}">${opts.xLabelFormatter(bars[bars.length - 1].label)}</text>`
         : ""
     }
   `;
@@ -256,8 +279,12 @@ function drawBarChart(svg, tooltip, values, labels, opts) {
       }
       tooltip.hidden = false;
       tooltip.textContent = `${opts.labelFormatter(closest.label)} · ${opts.valueFormatter(closest.v)}`;
-      tooltip.style.left = (closest.x + closest.w / 2) + "px";
-      tooltip.style.top = closest.y + "px";
+      positionChartTooltip(
+        tooltip,
+        svg,
+        ((closest.x + closest.w / 2) / w) * rect.width,
+        (closest.y / h) * rect.height
+      );
     };
     svg.onpointerleave = () => {
       tooltip.hidden = true;
@@ -314,6 +341,7 @@ function renderWeather() {
   // hier NICHT zusätzlich mit 3.6 umrechnen.
   setText("chipWind", Math.round(current.wind_speed_10m) + " km/h");
   setText("chipGust", Math.round(current.wind_gusts_10m) + " km/h");
+  setText("chipFeelsLike", Math.round(current.apparent_temperature) + "°");
   setText("chipHumidity", Math.round(current.relative_humidity_2m) + " %");
   setText("chipPressure", Math.round(current.surface_pressure) + " hPa");
   setText("chipPrecip", (current.precipitation ?? 0).toFixed(1) + " mm");
@@ -386,7 +414,7 @@ function renderForecast(daily) {
       (d, i) => `
       <button type="button" class="day" data-index="${i}" aria-haspopup="dialog">
         <div class="d">${d.dayLabel}</div>
-        ${iconMarkup(d.icon)}
+        ${iconMarkup(d.icon, `weather-icon weather-icon-${d.icon}`)}
         <div class="hi">${d.hi}°</div>
         <div class="lo">${d.lo}°</div>
         <svg class="ic chev"><use href="#i-chevron"/></svg>
@@ -738,15 +766,21 @@ function renderWarningsTile() {
 
   const preview = document.querySelector("#warningsOpen .warn-preview");
   if (preview) {
+    const buildTime = warningsPayload.buildStamp
+      ? new Date(warningsPayload.buildStamp).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })
+      : null;
+    const updatedMarkup = buildTime ? `<p class="warn-updated">${t("warnUpdated")}: ${buildTime}</p>` : "";
+
     if (warningsError) {
-      preview.innerHTML = `<p>${t("warnPreviewError")}</p>`;
+      preview.innerHTML = `<p>${t("warnPreviewError")}</p>${updatedMarkup}`;
     } else if (warnings.length === 0) {
-      preview.innerHTML = `<p>${t("warnPreviewEmpty")}</p>`;
+      preview.innerHTML = `<p>${t("warnPreviewEmpty")}</p>${updatedMarkup}`;
     } else {
+      const previewCount = window.matchMedia("(min-width: 1800px) and (min-height: 1000px)").matches ? 5 : 3;
       preview.innerHTML = warnings
-        .slice(0, 3)
+        .slice(0, previewCount)
         .map((w) => `<p class="warn-preview-item"><span class="warn-dot aqi-${severityToAqiKey(w.severity)}"></span>${warningLang(w).headline}</p>`)
-        .join("");
+        .join("") + updatedMarkup;
     }
   }
 
@@ -879,6 +913,30 @@ function setupSimplePanel(openId, panelId, backdropId, closeId) {
   });
 }
 
+function setupHelpTabs() {
+  const tabs = [...document.querySelectorAll(".help-tab")];
+  const selectTab = (selectedTab) => {
+    tabs.forEach((tab) => {
+      const active = tab === selectedTab;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      $(tab.dataset.helpTarget)?.classList.toggle("is-active", active);
+    });
+  };
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => selectTab(tab));
+    tab.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const nextIndex = (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[nextIndex].focus();
+      selectTab(tabs[nextIndex]);
+    });
+  });
+}
+
 function setupA11yPanel() {
   setupSimplePanel("a11yOpen", "a11yPanel", "a11yPanelBackdrop", "a11yPanelClose");
 
@@ -895,6 +953,12 @@ function setupA11yPanel() {
   if (hcToggle) {
     hcToggle.checked = getHighContrast();
     hcToggle.addEventListener("change", () => setHighContrast(hcToggle.checked));
+  }
+
+  const lightModeToggle = $("lightModeToggle");
+  if (lightModeToggle) {
+    lightModeToggle.checked = getTheme() === "light";
+    lightModeToggle.addEventListener("change", () => setTheme(lightModeToggle.checked ? "light" : "dark"));
   }
 
   setupSpeech();
@@ -959,6 +1023,7 @@ function refreshAll() {
   loadAirQuality();
 }
 
+initTheme();
 initLang();
 document.documentElement.toggleAttribute("data-high-contrast", getHighContrast());
 loadWarningsData();
@@ -983,6 +1048,7 @@ document.addEventListener("keydown", (e) => {
 
 setupA11yPanel();
 setupSimplePanel("helpOpen", "helpPanel", "helpPanelBackdrop", "helpPanelClose");
+setupHelpTabs();
 
 window.addEventListener("resize", debounce(redrawAllCharts, 150));
 

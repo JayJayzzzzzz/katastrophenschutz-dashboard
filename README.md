@@ -50,6 +50,9 @@ Ein Knopf oben rechts (Icon neben der Uhrzeit) öffnet ein Einstellungs-Panel mi
   ganzen Stylesheet ausschließlich über CSS-Variablen kommen, reicht dafür
   eine reine CSS-Umschaltung — kein Chart wird neu gezeichnet. Zustand und
   Sprache werden in `localStorage` gemerkt.
+- **Hell-/Dunkelmodus**: Im selben Einstellungs-Panel lässt sich zwischen
+  hellem und dunklem Farbschema wechseln. Die Auswahl bleibt gespeichert;
+  der Kontrastmodus funktioniert unabhängig davon in beiden Varianten.
 - **Sprachausgabe** (Web Speech API, `SpeechSynthesis`): liest eine kurze
   Zusammenfassung der aktuellen Lage vor (Wetter, Pegel, Brände,
   Luftqualität, Warnungen) — in der gerade gewählten Sprache. Funktioniert
@@ -79,6 +82,49 @@ mit Link — auch das komplett in allen fünf Sprachen.
 | Gefahrenkarte (Hochwasser) | [Umweltatlas Berlin / GDI Berlin](https://gdi.berlin.de/services/wms/ua_hochwassergefahrenkarten) (WMS) | Statisches Kartenbild (`<img>`), keine Live-Daten |
 
 Alle Quellen sind öffentlich und benötigen keinen API-Key.
+
+### Warum diese Quellen und Widgets?
+
+Die Auswahl verbindet die für eine schnelle Lageübersicht wichtigsten
+Bereiche mit öffentlich zugänglichen, möglichst direkt abrufbaren Daten:
+
+- **Wetter und Luftqualität (Open-Meteo):** Wetterlage, kurzfristiger Verlauf
+  und Vorhersage geben den meteorologischen Kontext; PM2.5/PM10 ergänzen die
+  Brandeinsätze um einen Hinweis auf mögliche Rauchbelastung.
+- **Pegel (PEGELONLINE/WSV):** Die Messstelle Berlin-Köpenick liefert einen
+  örtlichen Wasserstand samt Verlauf und Tendenz für die Spree.
+- **Feuerwehr (Berliner Feuerwehr Open Data):** Tageszahlen zu Bränden und
+  Gesamteinsätzen zeigen das Einsatzaufkommen; die mittlere Eintreffzeit des
+  ersten Löschfahrzeugs ergänzt es um einen zeitlichen Leistungsindikator.
+- **Amtliche Warnungen (NINA/BBK):** Warnungen sind für die Lagebeurteilung
+  vorrangig. Da der Browserzugriff durch CORS verhindert wird, kommen sie aus
+  dem Seiten-Build und werden im Workflow regelmäßig erneuert.
+- **Hochwassergefahrenkarte (Umweltatlas Berlin):** Sie ergänzt den aktuellen
+  Pegel um die amtliche, langfristige Gefährdungslage. Sie ist ausdrücklich
+  keine Live-Einsatzkarte.
+
+Die Kombination vermeidet Kennzahlen, für die keine verlässliche öffentliche
+Quelle verfügbar ist. Die Oberfläche kennzeichnet Aktualisierungsstände und
+Fehler; sie ersetzt keine amtlichen Warn- oder Einsatzsysteme.
+
+## Konfiguration
+
+Für den lokalen Start ist keine Konfiguration nötig. Die mitgelieferte
+`astro.config.mjs` ist zugleich die verwendbare Vorlage für dieses Repository:
+
+| Datei | Einstellung | Zweck / Anpassung |
+|---|---|---|
+| `astro.config.mjs` | `site` | Öffentliche Domain der GitHub-Pages-Site. Bei einem anderen GitHub-Nutzer oder einer eigenen Domain anpassen. |
+| `astro.config.mjs` | `base` | Repository-Unterpfad, z. B. `/katastrophenschutz-dashboard`. Für eine Root-Domain auf `/` setzen. |
+| `package.json` | `scripts` und `engines.node` | Start-, Build- und Vorschau-Befehle sowie erforderliche Node-Version. Nur ändern, wenn Laufzeit oder Tooling angepasst werden. |
+| `.github/workflows/deploy.yml` | `schedule` | Aktualisierungsintervall der beim Build geladenen Warnungen. Der Zeitplan kann bei Bedarf angepasst oder entfernt werden. |
+| `src/pages/index.astro` | `DASHBOARD_TEST_WARNING` | Optionaler lokaler Build-Schalter für eine Beispielwarnung; im normalen Build nicht setzen. |
+
+Nach einer Änderung an `site` oder `base` lokal mit `npm run build` prüfen
+und die URL an den neuen öffentlichen Pfad anpassen. Die Datenquellen selbst
+sind im Code fest auf Berlin und die oben genannten offenen Dienste
+ausgerichtet; ein Wechsel des Einsatzgebiets erfordert daher auch Änderungen
+an den Koordinaten, Stationskennung und Warngebietskennung.
 
 ## Geprüft, aber nicht umgesetzt
 

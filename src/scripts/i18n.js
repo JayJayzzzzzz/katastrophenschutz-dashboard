@@ -16,6 +16,13 @@ export const STRINGS = {
   noData: { de: "Keine Daten", en: "No data", fr: "Aucune donnée", pl: "Brak danych", es: "Sin datos" },
   standPrefix: { de: "Stand", en: "As of", fr: "à", pl: "Stan na", es: "Actualizado" },
   clockSuffix: { de: "Uhr", en: "", fr: "", pl: "", es: "" },
+  dashboardTitle: {
+    de: "Dashboard für den Katastrophenschutz Berlin",
+    en: "Berlin Civil Protection Dashboard",
+    fr: "Tableau de bord de la protection civile de Berlin",
+    pl: "Panel ochrony ludności Berlina",
+    es: "Panel de protección civil de Berlín",
+  },
 
   heroAriaLabel: {
     de: "Aktuelles Wetter und Luftqualität", en: "Current weather and air quality",
@@ -27,6 +34,7 @@ export const STRINGS = {
     pl: "Wczytywanie pogody…", es: "Cargando el tiempo…",
   },
   chipGust: { de: "Böen", en: "Gusts", fr: "Rafales", pl: "Porywy", es: "Rachas" },
+  chipFeelsLike: { de: "Gefühlt", en: "Feels like", fr: "Ressenti", pl: "Odczuwalna", es: "Sensación térmica" },
   chipPrecip: { de: "Niederschlag", en: "Precipitation", fr: "Précipitations", pl: "Opady", es: "Precipitación" },
   chipPressure: { de: "Luftdruck", en: "Pressure", fr: "Pression", pl: "Ciśnienie", es: "Presión" },
   chipAir: { de: "Luft", en: "Air", fr: "Air", pl: "Powietrze", es: "Aire" },
@@ -75,6 +83,7 @@ export const STRINGS = {
     de: "Bund/DWD für Berlin", en: "Federal Gov./DWD for Berlin", fr: "Gouv. fédéral/DWD pour Berlin",
     pl: "Rząd federalny/DWD dla Berlina", es: "Gobierno federal/DWD para Berlín",
   },
+  warnUpdated: { de: "Stand", en: "Updated", fr: "Mis à jour", pl: "Aktualizacja", es: "Actualizado" },
   warnSubError: {
     de: "Bund/DWD für Berlin nicht erreichbar", en: "Federal Gov./DWD for Berlin unreachable",
     fr: "Gouv. fédéral/DWD pour Berlin inaccessible", pl: "Rząd federalny/DWD dla Berlina niedostępny",
@@ -272,11 +281,11 @@ export const STRINGS = {
     es: "En un monitor de sala de control todo cabe en una pantalla sin desplazamiento; en tableta/smartphone la página se desplaza con normalidad.",
   },
   helpUsage6: {
-    de: "Über den Barrierefreiheit-Knopf (Symbol daneben) lassen sich Sprache, hoher Kontrast und eine Sprachausgabe der Lage einstellen.",
-    en: "The accessibility button (icon next to it) lets you set language, high contrast and a spoken summary of the situation.",
-    fr: "Le bouton d'accessibilité (icône à côté) permet de régler la langue, le contraste élevé et une lecture à voix haute de la situation.",
-    pl: "Przycisk dostępności (ikona obok) pozwala ustawić język, wysoki kontrast i odczytanie sytuacji na głos.",
-    es: "El botón de accesibilidad (icono junto a este) permite ajustar el idioma, el alto contraste y una lectura en voz alta de la situación.",
+    de: "Über den Barrierefreiheit-Knopf (Symbol daneben) lassen sich Sprache, Hell-/Dunkelmodus, hoher Kontrast und eine Sprachausgabe der Lage einstellen.",
+    en: "The accessibility button (icon next to it) lets you set the language, light/dark mode, high contrast and a spoken summary of the situation.",
+    fr: "Le bouton d'accessibilité (icône à côté) permet de régler la langue, le mode clair/sombre, le contraste élevé et la lecture à voix haute de la situation.",
+    pl: "Przycisk dostępności (ikona obok) pozwala ustawić język, jasny/ciemny motyw, wysoki kontrast i odczyt sytuacji na głos.",
+    es: "El botón de accesibilidad (icono junto a este) permite ajustar el idioma, el modo claro/oscuro, el alto contraste y la lectura en voz alta de la situación.",
   },
   helpNotesHeading: {
     de: "Zu beachten", en: "Important to know", fr: "À noter", pl: "Warto wiedzieć", es: "A tener en cuenta",
@@ -296,11 +305,11 @@ export const STRINGS = {
     es: "El mapa de riesgos es un mapa oficial estático — no muestra datos en vivo sobre una emergencia en curso.",
   },
   helpNotes3: {
-    de: "Alle Daten stammen von Drittquellen (siehe unten) und werden ungeprüft weitergegeben — im Ernstfall zusätzlich offizielle Kanäle prüfen (z. B. die NINA-App, Sirenen, Rundfunk).",
-    en: "All data comes from third-party sources (see below) and is passed on unverified — in an actual emergency, also check official channels (e.g. the NINA app, sirens, radio).",
-    fr: "Toutes les données proviennent de sources tierces (voir ci-dessous) et sont transmises sans vérification — en cas d'urgence réelle, consultez également les canaux officiels (par ex. l'application NINA, les sirènes, la radio).",
-    pl: "Wszystkie dane pochodzą ze źródeł zewnętrznych (patrz poniżej) i są przekazywane bez weryfikacji — w razie realnego zagrożenia sprawdź dodatkowo oficjalne kanały (np. aplikację NINA, syreny, radio).",
-    es: "Todos los datos provienen de fuentes externas (ver abajo) y se transmiten sin verificar — en una emergencia real, consulta también los canales oficiales (p. ej. la app NINA, sirenas, radio).",
+    de: "Die Daten werden aus den genannten externen Quellen übernommen; Verfügbarkeit, Aktualität und Messwerte können abweichen. Im Ernstfall zusätzlich offizielle Kanäle prüfen (z. B. NINA-App, Sirenen, Rundfunk).",
+    en: "Data is retrieved from the external sources listed below; availability, timeliness and measurements may vary. In an emergency, also check official channels (e.g. the NINA app, sirens, radio).",
+    fr: "Les données proviennent des sources externes indiquées ci-dessous ; leur disponibilité, leur actualité et les mesures peuvent varier. En cas d'urgence, consultez également les canaux officiels (par ex. l'application NINA, les sirènes, la radio).",
+    pl: "Dane pochodzą z wymienionych poniżej źródeł zewnętrznych; ich dostępność, aktualność i pomiary mogą się różnić. W razie zagrożenia sprawdź także oficjalne kanały (np. aplikację NINA, syreny, radio).",
+    es: "Los datos proceden de las fuentes externas indicadas abajo; su disponibilidad, actualidad y mediciones pueden variar. En una emergencia, consulta también los canales oficiales (p. ej. la app NINA, sirenas, radio).",
   },
   helpEmergency: {
     de: "Dieses Dashboard ersetzt keine amtliche Warnung und keinen Notruf. Im Notfall: 112.",
@@ -316,14 +325,52 @@ export const STRINGS = {
     de: "Wetter, Luftqualität", en: "Weather, air quality", fr: "Météo, qualité de l'air",
     pl: "Pogoda, jakość powietrza", es: "Tiempo, calidad del aire",
   },
+  helpSrc1Reason: {
+    de: "Wetter und Luftwerte liefern Kontext für wetterbedingte Gefahren und mögliche Rauchbelastung.",
+    en: "Weather and air-quality readings provide context for weather hazards and possible smoke exposure.",
+    fr: "La météo et la qualité de l'air contextualisent les risques météorologiques et une éventuelle exposition à la fumée.",
+    pl: "Pogoda i jakość powietrza pomagają ocenić zagrożenia pogodowe oraz możliwe zadymienie.",
+    es: "El tiempo y la calidad del aire aportan contexto sobre riesgos meteorológicos y posible exposición al humo.",
+  },
+  helpSrc2Reason: {
+    de: "Der örtliche Wasserstand mit Verlauf und Tendenz hilft, die Hochwasserlage an der Spree einzuschätzen.",
+    en: "The local water level, its history and trend help assess flood conditions on the Spree.",
+    fr: "Le niveau local, son évolution et sa tendance aident à évaluer le risque d'inondation sur la Spree.",
+    pl: "Lokalny poziom wody, jego przebieg i tendencja pomagają ocenić zagrożenie powodziowe na Sprewie.",
+    es: "El nivel local del agua, su evolución y tendencia ayudan a evaluar el riesgo de inundación en el Spree.",
+  },
   helpSrc3Label: {
     de: "Brände, Gesamteinsätze, Reaktionszeit", en: "Fires, total call-outs, response time",
     fr: "Incendies, interventions totales, temps de réaction", pl: "Pożary, wszystkie interwencje, czas reakcji",
     es: "Incendios, intervenciones totales, tiempo de respuesta",
   },
+  helpSrc3Reason: {
+    de: "Einsatzaufkommen und Eintreffzeit zeigen die tägliche Belastung und deren Entwicklung.",
+    en: "Call-out numbers and arrival times show daily workload and how it changes.",
+    fr: "Le nombre d'interventions et les délais d'arrivée indiquent la charge quotidienne et son évolution.",
+    pl: "Liczba interwencji i czas dojazdu pokazują dzienne obciążenie oraz jego zmiany.",
+    es: "El número de intervenciones y los tiempos de llegada muestran la carga diaria y su evolución.",
+  },
   helpSrc4Label: {
     de: "Amtliche Warnungen", en: "Official warnings", fr: "Alertes officielles", pl: "Oficjalne ostrzeżenia",
     es: "Avisos oficiales",
+  },
+  helpSrc4Reason: {
+    de: "Amtliche Warnungen informieren direkt über Gefahren und Verhaltensempfehlungen für Berlin.",
+    en: "Official warnings directly communicate hazards and recommended actions for Berlin.",
+    fr: "Les alertes officielles signalent directement les dangers et les consignes pour Berlin.",
+    pl: "Oficjalne ostrzeżenia bezpośrednio informują o zagrożeniach i zalecanym postępowaniu w Berlinie.",
+    es: "Los avisos oficiales informan directamente sobre peligros y recomendaciones para Berlín.",
+  },
+  helpSrc5Reason: {
+    de: "Die amtliche Karte ergänzt den aktuellen Pegel um langfristige Hochwasserrisikogebiete; sie zeigt keine Live-Einsätze.",
+    en: "The official map complements current water levels with long-term flood-risk areas; it does not show live incidents.",
+    fr: "La carte officielle complète le niveau actuel avec les zones de risque à long terme ; elle ne montre pas les interventions en direct.",
+    pl: "Urzędowa mapa uzupełnia bieżący poziom wody o długoterminowe obszary ryzyka; nie pokazuje zdarzeń na żywo.",
+    es: "El mapa oficial complementa el nivel actual con zonas de riesgo a largo plazo; no muestra incidentes en directo.",
+  },
+  a11yLightMode: {
+    de: "Heller Modus", en: "Light mode", fr: "Mode clair", pl: "Jasny motyw", es: "Modo claro",
   },
 };
 
@@ -455,6 +502,7 @@ export const SPEECH = {
 
 const STORAGE_KEY_LANG = "dashboard-lang";
 const STORAGE_KEY_HC = "dashboard-high-contrast";
+const STORAGE_KEY_THEME = "dashboard-theme";
 
 let currentLang = "de";
 
@@ -542,6 +590,31 @@ export function setHighContrast(on) {
     /* siehe oben */
   }
   document.documentElement.toggleAttribute("data-high-contrast", on);
+}
+
+export function getTheme() {
+  try {
+    return localStorage.getItem(STORAGE_KEY_THEME) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+export function setTheme(theme) {
+  const selectedTheme = theme === "light" ? "light" : "dark";
+  try {
+    localStorage.setItem(STORAGE_KEY_THEME, selectedTheme);
+  } catch {
+    /* siehe oben */
+  }
+  document.documentElement.dataset.theme = selectedTheme;
+  return selectedTheme;
+}
+
+export function initTheme() {
+  const theme = getTheme();
+  document.documentElement.dataset.theme = theme;
+  return theme;
 }
 
 // Wendet alle [data-i18n]-Texte und [data-i18n-aria]-aria-labels im Dokument
