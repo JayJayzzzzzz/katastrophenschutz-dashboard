@@ -5,6 +5,6 @@ import { defineConfig } from 'astro/config';
 // https://JayJayzzzzzz.github.io/katastrophenschutz-dashboard/
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://JayJayzzzzzz.github.io',
+  site: 'https://til2001.github.io',
   base: '/katastrophenschutz-dashboard',
 });
