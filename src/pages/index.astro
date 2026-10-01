@@ -128,6 +128,9 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		<defs>
 			<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.6 7-12a7 7 0 1 0-14 0c0 5.4 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></symbol>
 			<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+			<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M5.64 6.64A9 9 0 0 1 20 12"/><path d="M4 17v-5h5"/><path d="M4 12a9 9 0 0 0 14.36 5.36"/></symbol>
+			<symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2h12M6 22h12"/><path d="M7 2v4a5 5 0 0 0 2 4l3 2 3-2a5 5 0 0 0 2-4V2"/><path d="M7 22v-4a5 5 0 0 1 2-4l3-2 3 2a5 5 0 0 1 2 4v4"/></symbol>
+			<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
 			<symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6.5 7 6.5 11.5A6.5 6.5 0 1 1 5.5 14.5C5.5 10 12 3 12 3z"/></symbol>
 			<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.5c1 3-3 4.3-3 7.6a3 3 0 0 0 6 0c0-1.1-.9-1.6-.9-2.7 1.6 1.1 3.4 3.3 3.4 6a5.5 5.5 0 1 1-11 0c0-4.6 3.8-7 5.5-10.9z"/></symbol>
 			<symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 8h10.5a2.5 2.5 0 1 0-2.3-3.4"/><path d="M3 12.5h13.5a2.7 2.7 0 1 1-2.4 3.6"/><path d="M3 17h7.5"/></symbol>
@@ -141,7 +144,6 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			<symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 9.5h11a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 6 3.6"/><path d="M3 13.5h18M3 17h18M3 20.5h13"/></symbol>
 			<symbol id="i-thunder" viewBox="0 0 24 24"><path d="M6.5 12h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 12z"/><path d="m13 12-3 5h3l-2 5 6-7h-3z"/></symbol>
 			<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6l7-3z"/><path d="M9 12l2 2 4-4"/></symbol>
-			<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
 			<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 			<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19L12 3.5z"/><path d="M12 10v4.2"/><circle cx="12" cy="17.3" r="0.6" fill="currentColor" stroke="none"/></symbol>
 			<symbol id="i-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-2"/><path d="M9 2h6"/><path d="M12 2v2"/></symbol>
@@ -167,6 +169,9 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 						<span id="liveDate">–</span> · <span id="liveClock">--:--:--</span>
 						<span class="live-dot" aria-hidden="true"></span>
 					</div>
+					<button type="button" class="icon-btn" id="refreshData" data-i18n-aria="refreshData" data-i18n-title="refreshData" aria-label="Alle Datenquellen aktualisieren" title="Alle Datenquellen aktualisieren">
+						<svg class="ic" id="refreshDataIcon"><use href="#i-refresh"/></svg>
+					</button>
 					<button type="button" class="icon-btn" id="helpOpen" aria-haspopup="dialog" data-i18n-aria="helpBtnAria" aria-label="Kurzanleitung &amp; Quellen">
 						<svg class="ic"><use href="#i-info"/></svg>
 					</button>
@@ -258,10 +263,19 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 					<div class="k"><svg class="ic"><use href="#i-siren"/></svg><span data-i18n="totalLabel">Gesamteinsätze</span></div>
 					<div class="v"><span id="totalMissionsValue">--</span></div>
 					<div class="sub"><span data-i18n="allCategories">alle Kategorien</span> · <span data-i18n="amPrefix">am</span> <span id="fireDate2">--</span></div>
+					<div class="missions-comparison"><strong id="missionsDelta">--</strong><span data-i18n="missionsVsAverage">zum 7-Tage-Mittel</span></div>
+					<div class="mini-chart missions-mini-chart">
+						<svg id="missionsChart" aria-hidden="true"></svg>
+						<div id="missionsTooltip" class="chart-tooltip" hidden></div>
+					</div>
 				</section>
 
 				<button type="button" class="stat tile-half tile-half-btn" id="hazardMapOpen" aria-haspopup="dialog">
 					<div class="k"><svg class="ic"><use href="#i-map"/></svg><span data-i18n="hazardLabel">Gefahrenkarte</span></div>
+					<div class="hazard-inline-preview" aria-hidden="true">
+						<img class="hazard-layer" src="https://gdi.berlin.de/services/wms/alkis_bezirke?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=bezirksgrenzen&STYLES=&CRS=EPSG:4326&BBOX=52.33,13.08,52.68,13.76&WIDTH=900&HEIGHT=763&FORMAT=image/png&TRANSPARENT=TRUE" alt="" loading="lazy" />
+						<img class="hazard-layer" src="https://gdi.berlin.de/services/wms/ua_hochwassergefahrenkarten?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=c_hwgk_niedrig,b_hwgk_mittel,a_hwgk_hoch&STYLES=,,&CRS=EPSG:4326&BBOX=52.33,13.08,52.68,13.76&WIDTH=900&HEIGHT=763&FORMAT=image/png&TRANSPARENT=TRUE" alt="" loading="lazy" />
+					</div>
 					<div class="v" data-i18n="hazardValue">Hochwasser</div>
 					<div class="sub" data-i18n="hazardCta">Amtliche Karte ansehen</div>
 				</button>
@@ -551,10 +565,6 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			opacity: 0.92;
 		}
 
-		:root[data-high-contrast] .forecast :global(.chev) {
-			opacity: 0.9;
-		}
-
 		/* Warnstufen-Badges bekommen zusätzlich einen Rahmen in ihrer eigenen
 		   Farbe (currentColor), statt sich nur auf die leicht eingefärbte
 		   Fläche zu verlassen. */
@@ -696,6 +706,14 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			outline: none;
 		}
 
+		.icon-btn:disabled {
+			cursor: wait;
+		}
+
+		.icon-btn.is-updated {
+			color: var(--status-good);
+		}
+
 		.hero-block,
 		.stat,
 		.chart-box {
@@ -818,6 +836,39 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			min-height: 0;
 			--icon-color: var(--muted);
 			justify-content: center;
+		}
+
+		.missions-comparison {
+			display: flex;
+			align-items: baseline;
+			flex-wrap: wrap;
+			gap: 5px;
+			margin-top: 1px;
+			color: var(--muted);
+			font-size: 11.5px;
+			line-height: 1.2;
+			font-variant-numeric: tabular-nums;
+		}
+
+		.missions-comparison strong {
+			font-size: 1.1em;
+			color: var(--text);
+		}
+
+		.missions-comparison.is-above strong {
+			color: var(--series-fire);
+		}
+
+		.missions-comparison.is-below strong {
+			color: var(--series-pegel);
+		}
+
+		.missions-mini-chart {
+			display: none;
+		}
+
+		.hazard-inline-preview {
+			display: none;
 		}
 
 		.tile-half-btn {
@@ -1152,14 +1203,6 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			font-size: 12px;
 			color: var(--muted);
 			font-variant-numeric: tabular-nums;
-		}
-
-		.forecast :global(.chev) {
-			width: 13px;
-			height: 13px;
-			color: var(--muted);
-			opacity: 0.6;
-			margin-top: 4px;
 		}
 
 		/* ---------- Tages-Detail (Fokus-Ansicht der 7-Tage-Vorhersage) ---------- */
@@ -1582,8 +1625,8 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 
 		.help-panel-box {
 			width: min(1120px, 100%);
-			height: min(880px, calc(100dvh - 40px));
-			max-height: none;
+			height: auto;
+			max-height: calc(100dvh - 40px);
 			overflow: hidden;
 			display: flex;
 			flex-direction: column;
@@ -1603,11 +1646,11 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		}
 
 		.help-layout {
-			flex: 1;
+			flex: 0 0 auto;
 			min-height: 0;
 			display: grid;
-			grid-template-rows: minmax(0, 1.1fr) minmax(0, 0.9fr);
-			gap: 12px;
+			grid-template-rows: auto auto;
+			gap: 16px;
 		}
 
 		.help-overview {
@@ -1631,11 +1674,11 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		}
 
 		.help-heading {
-			font-size: 12px;
+			font-size: 13px;
 			text-transform: uppercase;
 			letter-spacing: 0.03em;
 			color: var(--muted);
-			margin: 10px 0 6px;
+			margin: 12px 0 8px;
 		}
 
 		.help-heading:first-of-type {
@@ -1647,10 +1690,10 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			padding-left: 18px;
 			display: flex;
 			flex-direction: column;
-			gap: 4px;
-			font-size: 13px;
+			gap: 6px;
+			font-size: 15px;
 			color: var(--text);
-			line-height: 1.38;
+			line-height: 1.4;
 		}
 
 		.help-emergency {
@@ -1660,7 +1703,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			background: color-mix(in srgb, var(--status-critical) 14%, transparent);
 			color: var(--status-critical);
 			font-weight: 700;
-			font-size: 12.5px;
+			font-size: 14px;
 		}
 
 		.help-sources {
@@ -1670,8 +1713,8 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 			align-content: start;
-			gap: 8px 24px;
-			font-size: 12.5px;
+			gap: 12px 28px;
+			font-size: 14px;
 			color: var(--muted);
 		}
 
@@ -1683,8 +1726,8 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		.help-sources .source-reason {
 			display: block;
 			margin-top: 2px;
-			font-size: 11.5px;
-			line-height: 1.35;
+			font-size: 12.5px;
+			line-height: 1.4;
 			color: var(--muted);
 		}
 
@@ -1734,6 +1777,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 
 			.help-layout {
 				display: block;
+				flex: 1;
 			}
 
 			.help-overview {
@@ -1808,7 +1852,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		   die beiden wichtigen Feuerwehr-/Gefahren-Kacheln teilen sich zwei. */
 		@media (min-width: 1800px) and (min-height: 1000px) {
 			html {
-				font-size: 18px;
+				font-size: 20px;
 			}
 
 			.layout {
@@ -1817,7 +1861,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				grid-template-areas:
 					"top top top top"
 					"hero pegel fire warn"
-					"chart resptime total total"
+					"chart resptime total hazard"
 					"forecast forecast forecast forecast";
 			}
 
@@ -1900,7 +1944,44 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			}
 
 			.stack-col {
-				gap: 16px;
+				display: contents;
+			}
+
+			.stack-col > :first-child {
+				grid-area: total;
+			}
+
+			.stack-col > :last-child {
+				grid-area: hazard;
+			}
+
+			.hazard-inline-preview {
+				position: relative;
+				order: 1;
+				display: block;
+				flex: 1 1 auto;
+				width: 100%;
+				min-height: 0;
+				margin: 8px 0;
+				border-radius: 8px;
+				background: #e9eef1;
+				overflow: hidden;
+			}
+
+			.hazard-inline-preview .hazard-layer {
+				object-fit: contain;
+			}
+
+			#hazardMapOpen .k {
+				order: 0;
+			}
+
+			#hazardMapOpen .v {
+				order: 2;
+			}
+
+			#hazardMapOpen .sub {
+				order: 3;
 			}
 
 			.warn-preview {
@@ -1921,46 +2002,421 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				padding: 18px 24px 14px;
 			}
 
-			.chart-head {
+			.dashboard-title {
+				font-size: 1.3rem;
+			}
+
+			.place {
+				font-size: 0.95rem;
+			}
+
+			.timestamp {
 				font-size: 1rem;
+			}
+
+			.icon-btn {
+				width: 40px;
+				height: 40px;
+			}
+
+			.icon-btn .ic {
+				width: 20px;
+				height: 20px;
+			}
+
+			.temp-big {
+				font-size: 4.2rem;
+			}
+
+			.hero-icon {
+				width: 80px;
+				height: 80px;
+			}
+
+			.cond {
+				font-size: 1.45rem;
+			}
+
+			.minmax {
+				font-size: 1.1rem;
+			}
+
+			.chip {
+				font-size: 0.95rem;
+			}
+
+			.status {
+				font-size: 0.95rem;
+			}
+
+			.stat .k {
+				font-size: 1.05rem;
+			}
+
+			.stat .v {
+				font-size: 2.45rem;
+			}
+
+			.stat .sub {
+				font-size: 1.05rem;
+			}
+
+			.stat .sub.muted {
+				font-size: 0.95rem;
+			}
+
+			.stat.tile-half .v {
+				font-size: 3.2rem;
+			}
+
+			.stat.tile-half .k {
+				font-size: 1.1rem;
+			}
+
+			.missions-comparison {
+				font-size: 0.95rem;
+				gap: 10px;
+			}
+
+			.missions-comparison strong {
+				font-size: 1.2em;
+			}
+
+			.missions-mini-chart {
+				display: block;
+				flex: 1 1 auto;
+				min-height: 110px;
+				margin: 8px 0 0;
+			}
+
+			.warn-preview-item {
+				font-size: 1.1rem !important;
+			}
+
+			.warn-preview .warn-updated {
+				font-size: 0.95rem;
+			}
+
+			.chart-head {
+				font-size: 1.15rem;
 				margin-bottom: 10px;
 			}
 
 			.chart-tooltip {
 				padding: 9px 14px;
-				font-size: 1rem;
-			}
-
-			.dashboard-title {
-				font-size: 1.2rem;
-			}
-
-			.forecast {
-				gap: 14px;
-			}
-
-			.forecast :global(.day) {
-				padding: 16px 10px;
-				gap: 5px;
+				font-size: 1.1rem;
 			}
 
 			.forecast :global(.d),
 			.forecast :global(.lo) {
-				font-size: 0.95rem;
+				font-size: 1.05rem;
 			}
 
 			.forecast :global(.ic) {
-				width: 34px;
-				height: 34px;
+				width: 42px;
+				height: 42px;
 			}
 
 			.forecast :global(.hi) {
+				font-size: 1.5rem;
+			}
+
+			.forecast :global(.day) {
+				padding: 18px 12px;
+				gap: 7px;
+			}
+
+			.day-modal-panel {
+				width: min(640px, 100%);
+				max-height: calc(100dvh - 80px);
+				padding: 36px 40px 34px;
+				border-radius: 20px;
+			}
+
+			.day-modal-close {
+				width: 44px;
+				height: 44px;
+			}
+
+			.day-modal-close .ic {
+				width: 20px;
+				height: 20px;
+			}
+
+			.day-modal-icon {
+				width: 64px;
+				height: 64px;
+			}
+
+			.day-modal-date {
 				font-size: 1.3rem;
 			}
 
-			.forecast :global(.chev) {
-				width: 18px;
-				height: 18px;
+			.day-modal-cond {
+				font-size: 1.05rem;
+			}
+
+			.day-modal-temps {
+				font-size: 1.8rem;
+				margin: 18px 0 24px;
+			}
+
+			.day-modal-grid {
+				gap: 14px;
+			}
+
+			.dm-stat {
+				padding: 16px 18px;
+			}
+
+			.dm-k {
+				font-size: 0.85rem;
+			}
+
+			.dm-v {
+				font-size: 1.25rem;
+			}
+
+			.warn-modal-panel {
+				width: min(900px, 100%);
+			}
+
+			.warn-modal-panel h2,
+			.hazard-modal-panel h2,
+			.a11y-panel-box h2,
+			.help-panel-box h2 {
+				font-size: 1.5rem;
+			}
+
+			.warn-list {
+				gap: 16px;
+			}
+
+			.warn-card {
+				padding: 20px 22px;
+				border-radius: 12px;
+			}
+
+			.warn-badge {
+				font-size: 0.85rem;
+				padding: 5px 12px;
+			}
+
+			.warn-time,
+			.warn-meta {
+				font-size: 0.9rem;
+			}
+
+			.warn-card h3 {
+				font-size: 1.3rem;
+			}
+
+			.warn-desc,
+			.warn-instr {
+				font-size: 1.1rem;
+			}
+
+			.warn-footnote {
+				font-size: 0.9rem;
+			}
+
+			.hazard-modal-panel {
+				width: min(1280px, 100%);
+			}
+
+			.hazard-sub {
+				font-size: 1.05rem;
+			}
+
+			.hazard-map-wrap {
+				border-radius: 12px;
+			}
+
+			.a11y-panel-box {
+				width: min(560px, 100%);
+			}
+
+			.lang-btn,
+			.a11y-toggle {
+				font-size: 1rem;
+			}
+
+			.a11y-speak-btn {
+				font-size: 1rem;
+				padding: 14px 18px;
+			}
+
+			.a11y-toggle-track {
+				width: 48px;
+				height: 26px;
+			}
+
+			.a11y-toggle-track::after {
+				width: 20px;
+				height: 20px;
+			}
+
+			.a11y-toggle input:checked + .a11y-toggle-track::after {
+				transform: translateX(22px);
+			}
+
+			.help-panel-box {
+				width: min(1400px, 100%);
+				padding: 36px 44px 34px;
+			}
+
+			.help-layout {
+				gap: 24px;
+			}
+
+			.help-overview {
+				gap: 36px;
+			}
+
+			.help-heading {
+				font-size: 0.95rem;
+			}
+
+			.help-list {
+				font-size: 1.1rem;
+				gap: 8px;
+			}
+
+			.help-emergency {
+				font-size: 1.05rem;
+				padding: 12px 16px;
+			}
+
+			.help-sources {
+				font-size: 1.05rem;
+				gap: 16px 40px;
+			}
+
+			.help-sources .source-reason {
+				font-size: 0.95rem;
+			}
+
+			.help-panel-box .help-sources-section {
+				padding-top: 12px;
+			}
+		}
+
+		@media (min-width: 1800px) and (min-height: 1000px) and (max-height: 1300px) {
+			html {
+				font-size: 17px;
+			}
+
+			.layout {
+				grid-template-rows: auto minmax(460px, 0.72fr) minmax(320px, 0.62fr) minmax(130px, auto);
+			}
+
+			.hero-block {
+				padding: 18px 20px;
+				gap: 10px;
+			}
+
+			.temp-big {
+				font-size: 3.3rem;
+			}
+
+			.hero-icon {
+				width: 60px;
+				height: 60px;
+			}
+
+			.cond {
+				font-size: 1.05rem;
+			}
+
+			.minmax {
+				font-size: 0.9rem;
+			}
+
+			.chips {
+				gap: 8px;
+			}
+
+			.chip {
+				font-size: 0.8rem;
+				padding: 5px 8px;
+			}
+
+			.status {
+				font-size: 0.75rem;
+			}
+
+			.stat {
+				padding: 16px 18px;
+				gap: 5px;
+			}
+
+			.stat .k {
+				font-size: 0.85rem;
+			}
+
+			.stat .v {
+				font-size: 1.95rem;
+			}
+
+			.stat .sub {
+				font-size: 0.85rem;
+			}
+
+			.stat .sub.muted {
+				font-size: 0.75rem;
+			}
+
+			.stat.tile-half {
+				padding: 14px 16px;
+			}
+
+			.stat.tile-half .v {
+				font-size: 2.6rem;
+			}
+
+			.forecast :global(.day) {
+				padding: 10px 8px;
+				gap: 3px;
+			}
+
+			.forecast :global(.d),
+			.forecast :global(.lo) {
+				font-size: 0.85rem;
+			}
+
+			.forecast :global(.ic) {
+				width: 28px;
+				height: 28px;
+			}
+
+			.forecast :global(.hi) {
+				font-size: 1.15rem;
+			}
+
+			.day-modal-panel {
+				width: min(600px, 100%);
+				padding: 30px 32px 28px;
+			}
+
+			.warn-modal-panel {
+				width: min(820px, 100%);
+			}
+
+			.hazard-modal-panel {
+				width: min(1120px, 100%);
+			}
+
+			.a11y-panel-box {
+				width: min(500px, 100%);
+			}
+
+			.help-panel-box {
+				width: min(1220px, 100%);
+				padding: 28px 34px 26px;
+			}
+
+			.help-panel-box {
+				max-height: calc(100dvh - 32px);
 			}
 		}
 
@@ -1971,6 +2427,263 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 
 			.chart-box {
 				max-height: 740px;
+			}
+		}
+
+		@media (min-width: 3000px) and (min-height: 1600px) {
+			html {
+				font-size: 22px;
+			}
+
+			.dashboard-title {
+				font-size: 1.45rem;
+			}
+
+			.place {
+				font-size: 1.05rem;
+			}
+
+			.timestamp {
+				font-size: 1.15rem;
+			}
+
+			.icon-btn {
+				width: 46px;
+				height: 46px;
+			}
+
+			.icon-btn .ic {
+				width: 23px;
+				height: 23px;
+			}
+
+			.hero-block {
+				padding: 30px 34px;
+				gap: 18px;
+			}
+
+			.temp-big {
+				font-size: 4.6rem;
+			}
+
+			.hero-icon {
+				width: 92px;
+				height: 92px;
+			}
+
+			.cond {
+				font-size: 1.6rem;
+			}
+
+			.minmax {
+				font-size: 1.2rem;
+			}
+
+			.chips {
+				gap: 12px;
+			}
+
+			.chip {
+				font-size: 1.05rem;
+				padding: 10px 14px;
+			}
+
+			.chip .ic.sm {
+				width: 19px;
+				height: 19px;
+			}
+
+			.status {
+				font-size: 1rem;
+			}
+
+			.stat {
+				padding: 28px 32px;
+				gap: 12px;
+			}
+
+			.stat .k {
+				font-size: 1.15rem;
+			}
+
+			.stat .v {
+				font-size: 2.8rem;
+			}
+
+			.stat .sub {
+				font-size: 1.15rem;
+			}
+
+			.stat .sub.muted {
+				font-size: 1rem;
+			}
+
+			.stat.tile-half {
+				padding: 24px 28px;
+			}
+
+			.stat.tile-half .v {
+				font-size: 3.8rem;
+			}
+
+			.missions-comparison {
+				font-size: 1.05rem;
+			}
+
+			.missions-mini-chart {
+				min-height: 150px;
+			}
+
+			.stat.tile-half .k {
+				font-size: 1.2rem;
+			}
+
+			.warn-preview-item {
+				font-size: 1.2rem !important;
+			}
+
+			.chart-head {
+				font-size: 1.3rem;
+			}
+
+			.chart-tooltip {
+				font-size: 1.3rem;
+				padding: 12px 18px;
+			}
+
+			.forecast :global(.d),
+			.forecast :global(.lo) {
+				font-size: 1.1rem;
+			}
+
+			.forecast :global(.ic) {
+				width: 48px;
+				height: 48px;
+			}
+
+			.forecast :global(.hi) {
+				font-size: 1.7rem;
+			}
+
+			.forecast :global(.day) {
+				padding: 22px 14px;
+				gap: 9px;
+			}
+
+			.day-modal-panel {
+				width: min(760px, 100%);
+				padding: 44px 48px 40px;
+			}
+
+			.day-modal-close {
+				width: 52px;
+				height: 52px;
+			}
+
+			.day-modal-close .ic {
+				width: 24px;
+				height: 24px;
+			}
+
+			.day-modal-icon {
+				width: 76px;
+				height: 76px;
+			}
+
+			.day-modal-date {
+				font-size: 1.5rem;
+			}
+
+			.day-modal-cond {
+				font-size: 1.2rem;
+			}
+
+			.day-modal-temps {
+				font-size: 2rem;
+			}
+
+			.dm-stat {
+				padding: 20px 22px;
+			}
+
+			.dm-k {
+				font-size: 1rem;
+			}
+
+			.dm-v {
+				font-size: 1.4rem;
+			}
+
+			.warn-modal-panel {
+				width: min(1080px, 100%);
+			}
+
+			.warn-modal-panel h2,
+			.hazard-modal-panel h2,
+			.a11y-panel-box h2,
+			.help-panel-box h2 {
+				font-size: 1.7rem;
+			}
+
+			.warn-card {
+				padding: 24px 28px;
+			}
+
+			.warn-card h3 {
+				font-size: 1.45rem;
+			}
+
+			.warn-desc,
+			.warn-instr {
+				font-size: 1.25rem;
+			}
+
+			.warn-time,
+			.warn-meta,
+			.warn-footnote {
+				font-size: 1rem;
+			}
+
+			.hazard-modal-panel {
+				width: min(1520px, 100%);
+			}
+
+			.hazard-sub {
+				font-size: 1.2rem;
+			}
+
+			.a11y-panel-box {
+				width: min(680px, 100%);
+			}
+
+			.lang-btn,
+			.a11y-toggle {
+				font-size: 1.1rem;
+			}
+
+			.lang-btn {
+				padding: 12px 16px;
+			}
+
+			.help-panel-box {
+				width: min(1600px, 100%);
+				padding: 44px 52px 40px;
+			}
+
+			.layout {
+				grid-template-rows: auto minmax(560px, 0.9fr) minmax(460px, 0.7fr) minmax(320px, 0.3fr);
+			}
+
+			.help-list {
+				font-size: 1.2rem;
+			}
+
+			.help-sources {
+				font-size: 1.15rem;
+			}
+
+			.help-sources .source-reason {
+				font-size: 1rem;
 			}
 		}
 

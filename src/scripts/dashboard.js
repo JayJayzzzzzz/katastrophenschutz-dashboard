@@ -89,7 +89,9 @@ function markUpdated(elId) {
 const charts = {}; // name -> { svg, tooltip, draw: fn() }
 
 function chartLabelFontSize() {
-  return window.matchMedia("(min-width: 1800px) and (min-height: 1000px)").matches ? 14 : 10.5;
+  if (window.matchMedia("(min-width: 3000px) and (min-height: 1600px)").matches) return 18;
+  if (window.matchMedia("(min-width: 1800px) and (min-height: 1000px)").matches) return 14;
+  return 10.5;
 }
 
 function registerChart(name, svg, tooltip, drawFn) {
@@ -417,7 +419,6 @@ function renderForecast(daily) {
         ${iconMarkup(d.icon, `weather-icon weather-icon-${d.icon}`)}
         <div class="hi">${d.hi}°</div>
         <div class="lo">${d.lo}°</div>
-        <svg class="ic chev"><use href="#i-chevron"/></svg>
       </button>`
     )
     .join("");
@@ -553,7 +554,6 @@ function renderFire() {
 
   setText("fireCount", Math.round(latest.fireCount));
   setText("fireDate", formatDisplayDate(latest.date));
-  setText("fireDate2", formatDisplayDate(latest.date));
   speechState.fireCount = Math.round(latest.fireCount);
 
   if (last14.length) {
@@ -576,12 +576,55 @@ function renderFire() {
     charts.fire.draw();
   }
 
-  // Gesamteinsätze (alle Kategorien: Rettungsdienst, Brände, technische
-  // Hilfe, …) am selben Tag wie oben — eine einfache zusätzliche Kennzahl.
-  if (latest.missionsAll != null) {
-    setText("totalMissionsValue", Math.round(latest.missionsAll).toLocaleString(locale()));
+  const missionRows = completeRows.filter((row) => row.missionsAll != null);
+  const latestMission = missionRows[missionRows.length - 1];
+  if (latestMission) {
+    setText("totalMissionsValue", Math.round(latestMission.missionsAll).toLocaleString(locale()));
+    setText("fireDate2", formatDisplayDate(latestMission.date));
   } else {
     setText("totalMissionsValue", "--");
+    setText("fireDate2", "--");
+  }
+
+  const previousSeven = missionRows.slice(-8, -1);
+  const comparison = $("missionsDelta");
+  if (latestMission && previousSeven.length === 7) {
+    const average = previousSeven.reduce((sum, row) => sum + row.missionsAll, 0) / previousSeven.length;
+    if (average > 0) {
+      const changePercent = Math.round(((latestMission.missionsAll - average) / average) * 100);
+      const direction = changePercent > 0 ? "↑ +" : changePercent < 0 ? "↓ −" : "→ ";
+      setText("missionsDelta", `${direction}${Math.abs(changePercent).toLocaleString(locale())} %`);
+      comparison?.parentElement?.classList.toggle("is-above", changePercent > 0);
+      comparison?.parentElement?.classList.toggle("is-below", changePercent < 0);
+    } else {
+      setText("missionsDelta", t("noData"));
+    }
+  } else {
+    setText("missionsDelta", t("noData"));
+  }
+
+  const last14Missions = missionRows.slice(-14);
+  if (last14Missions.length) {
+    registerChart("missions", $("missionsChart"), $("missionsTooltip"), () =>
+      drawBarChart(
+        $("missionsChart"),
+        $("missionsTooltip"),
+        last14Missions.map((row) => row.missionsAll),
+        last14Missions.map((row) => row.date),
+        {
+          color: "var(--series-pegel)",
+          highlightColor: "var(--series-pegel)",
+          padding: { top: 8, right: 8, bottom: 24, left: 8 },
+          valueFormatter: (value) => Math.round(value).toLocaleString(locale()) + " " + t("unitEinsaetze"),
+          labelFormatter: (date) => formatDisplayDate(date),
+          xLabelFirst: true,
+          xLabelFormatter: (date) => formatShortDate(date),
+        }
+      )
+    );
+    charts.missions.draw();
+  } else {
+    $("missionsChart")?.replaceChildren();
   }
 
   // Ø Reaktionszeit (Eintreffzeit erstes Löschfahrzeug) über die letzten
@@ -1016,16 +1059,59 @@ function setSpeakButtonState(speaking) {
 
 // ---------- Start ----------
 
-function refreshAll() {
-  loadWeather();
-  loadFireCount();
-  loadPegel();
-  loadAirQuality();
+function setRefreshButtonState(state) {
+  const button = $("refreshData");
+  const icon = $("refreshDataIcon");
+  if (!button || !icon) return;
+
+  const stateKeys = {
+    idle: ["refreshData", "i-refresh"],
+    loading: ["refreshingData", "i-hourglass"],
+    done: ["refreshDataDone", "i-check"],
+  };
+  const [labelKey, iconName] = stateKeys[state];
+  const label = t(labelKey);
+
+  button.disabled = state === "loading";
+  button.classList.toggle("is-updated", state === "done");
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  icon.querySelector("use")?.setAttribute("href", `#${iconName}`);
+}
+
+async function refreshAll(showRefreshStatus = false) {
+  try {
+    await Promise.all([loadWeather(), loadFireCount(), loadPegel(), loadAirQuality()]);
+  } finally {
+    if (showRefreshStatus) {
+      try {
+        sessionStorage.removeItem("dashboard-refresh-pending");
+      } catch {
+        // Ignore unavailable session storage.
+      }
+      setRefreshButtonState("done");
+      setTimeout(() => setRefreshButtonState("idle"), 2000);
+    }
+  }
+}
+
+function updateHazardPreviewLoading() {
+  const showInlineMap = window.matchMedia("(min-width: 1800px) and (min-height: 1000px)").matches;
+  document.querySelectorAll(".hazard-inline-preview img").forEach((image) => {
+    image.loading = showInlineMap ? "eager" : "lazy";
+  });
 }
 
 initTheme();
 initLang();
 document.documentElement.toggleAttribute("data-high-contrast", getHighContrast());
+let refreshPendingOnLoad = false;
+try {
+  refreshPendingOnLoad = sessionStorage.getItem("dashboard-refresh-pending") === "1";
+} catch {
+  // Ignore unavailable session storage.
+}
+if (refreshPendingOnLoad) setRefreshButtonState("loading");
 loadWarningsData();
 applyStaticTranslations();
 renderWarningsTile();
@@ -1049,11 +1135,24 @@ document.addEventListener("keydown", (e) => {
 setupA11yPanel();
 setupSimplePanel("helpOpen", "helpPanel", "helpPanelBackdrop", "helpPanelClose");
 setupHelpTabs();
+$("refreshData")?.addEventListener("click", () => {
+  setRefreshButtonState("loading");
+  try {
+    sessionStorage.setItem("dashboard-refresh-pending", "1");
+  } catch {
+    // The reload still works when session storage is unavailable.
+  }
+  window.location.reload();
+});
 
-window.addEventListener("resize", debounce(redrawAllCharts, 150));
+window.addEventListener("resize", debounce(() => {
+  redrawAllCharts();
+  updateHazardPreviewLoading();
+}, 150));
 
 updateClock();
+updateHazardPreviewLoading();
 setInterval(updateClock, 1000);
 
-refreshAll();
+refreshAll(refreshPendingOnLoad);
 setInterval(refreshAll, 5 * 60 * 1000); // alle 5 Minuten aktualisieren

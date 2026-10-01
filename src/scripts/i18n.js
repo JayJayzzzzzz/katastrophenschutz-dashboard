@@ -23,6 +23,27 @@ export const STRINGS = {
     pl: "Panel ochrony ludności Berlina",
     es: "Panel de protección civil de Berlín",
   },
+  refreshData: {
+    de: "Alle Datenquellen aktualisieren",
+    en: "Refresh all data sources",
+    fr: "Actualiser toutes les sources de données",
+    pl: "Odśwież wszystkie źródła danych",
+    es: "Actualizar todas las fuentes de datos",
+  },
+  refreshingData: {
+    de: "Daten werden aktualisiert",
+    en: "Updating data",
+    fr: "Mise à jour des données",
+    pl: "Aktualizowanie danych",
+    es: "Actualizando datos",
+  },
+  refreshDataDone: {
+    de: "Datenaktualisierung abgeschlossen",
+    en: "Data update complete",
+    fr: "Mise à jour des données terminée",
+    pl: "Aktualizacja danych zakończona",
+    es: "Actualización de datos completada",
+  },
 
   heroAriaLabel: {
     de: "Aktuelles Wetter und Luftqualität", en: "Current weather and air quality",
@@ -121,6 +142,13 @@ export const STRINGS = {
   allCategories: {
     de: "alle Kategorien", en: "all categories", fr: "toutes catégories", pl: "wszystkie kategorie",
     es: "todas las categorías",
+  },
+  missionsVsAverage: {
+    de: "zum Mittel der vorherigen 7 Tage",
+    en: "vs. previous 7-day average",
+    fr: "par rapport à la moyenne des 7 jours précédents",
+    pl: "względem średniej z poprzednich 7 dni",
+    es: "frente al promedio de los 7 días anteriores",
   },
   hazardLabel: { de: "Gefahrenkarte", en: "Hazard map", fr: "Carte des risques", pl: "Mapa zagrożeń", es: "Mapa de riesgos" },
   hazardValue: { de: "Hochwasser", en: "Flooding", fr: "Inondation", pl: "Powódź", es: "Inundación" },
