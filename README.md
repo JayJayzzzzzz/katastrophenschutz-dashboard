@@ -513,7 +513,7 @@ Einmalig in den Repository-Einstellungen einrichten:
 Die Seite ist danach erreichbar unter:
 
 ```
-https://JayJayzzzzzz.github.io/katastrophenschutz-dashboard/
+https://til2001.github.io/katastrophenschutz-dashboard/
 ```
 
 `site` und `base` in [`astro.config.mjs`](astro.config.mjs) sind bereits
@@ -535,10 +535,41 @@ src/
                          Warnungen-Abruf (Astro-Frontmatter)
   scripts/dashboard.js  Live-Daten laden (Wetter, Luft, Pegel, Brände),
                          Uhr, generische Chart-Zeichenfunktionen, Modals
+  scripts/i18n.js       Übersetzungen, Zahlen-/Datumsformate, Theme- und
+                         Kontrast-Einstellungen
+public/                 Statische Dateien wie Favicons
+astro.config.mjs        Zieladresse und Basis-Pfad für GitHub Pages
+package.json            Abhängigkeiten sowie Start-, Build- und Preview-Befehle
 legacy/
   ScheererTilWeatherApp.html   Erster Prototyp (Einzeldatei, vor der Astro-Umstellung)
 .github/workflows/deploy.yml   Build & Deploy nach GitHub Pages (push + Zeitplan)
 ```
+
+## Begründung der Implementierung
+
+Das Dashboard ist in eine Build-Phase und eine Browser-Phase aufgeteilt. Astro
+erzeugt beim Build aus `src/pages/index.astro` die statische HTML-Seite. In
+deren Frontmatter werden die amtlichen NINA-Warnungen serverseitig abgerufen
+und als JSON in die Seite eingebettet. Das ist nötig, weil der Browserzugriff
+auf diese API durch CORS blockiert wird. Ein dauerhaft laufendes Backend gibt
+es nicht: GitHub Pages liefert nur die fertigen Dateien aus. GitHub Actions
+baut sie bei Änderungen und zusätzlich alle 30 Minuten neu, damit die
+eingebetteten Warnungen regelmäßig aktualisiert werden.
+
+Nach dem Laden übernimmt `src/scripts/dashboard.js` die Daten, die direkt im
+Browser abrufbar sind: Wetter und Luftqualität von Open-Meteo, den Pegel von
+PEGELONLINE sowie die Tages-CSV der Berliner Feuerwehr. Das Script aktualisiert
+die Anzeigen, zeichnet die Diagramme und steuert die Detailfenster. Die
+einzelnen Datenbereiche werden getrennt geladen; fällt eine Quelle aus, können
+die übrigen Kacheln weiterhin funktionieren. `src/scripts/i18n.js` hält die
+Übersetzungen und verwaltet Sprache, Hell-/Dunkelmodus und hohen Kontrast.
+
+Diese Aufteilung passt zum statischen Hosting: Für die meisten öffentlichen
+APIs ist kein eigener Server nötig, während nur die CORS-beschränkten Warnungen
+beim Build verarbeitet werden. Das reduziert Betrieb und Infrastruktur, ohne
+auf die benötigten Kennzahlen und Funktionen zu verzichten. Die Gefahrenkarte
+wird als statisches Kartenbild eingebunden und deshalb ausdrücklich nicht als
+Live-Einsatzinformation dargestellt.
 
 ## Stand
 
