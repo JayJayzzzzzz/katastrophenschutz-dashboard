@@ -25,7 +25,3 @@ pnpm-debug.log*
 
 # local Claude Code session state
 .claude/
-
-# Schulkram
-docs/
-Begruendung-der-Implementierung.md
