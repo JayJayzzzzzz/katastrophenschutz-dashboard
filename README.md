@@ -513,7 +513,7 @@ Einmalig in den Repository-Einstellungen einrichten:
 Die Seite ist danach erreichbar unter:
 
 ```
-https://til2001.github.io/katastrophenschutz-dashboard/
+https://jayjayzzzzzz.github.io/katastrophenschutz-dashboard/
 ```
 
 `site` und `base` in [`astro.config.mjs`](astro.config.mjs) sind bereits
