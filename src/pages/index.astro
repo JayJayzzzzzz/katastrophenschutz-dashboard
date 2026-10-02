@@ -3,12 +3,17 @@
 // Statische Astro-Seite; die meisten Live-Daten werden im Browser nachgeladen
 // (siehe src/scripts/dashboard.js) — passt zu einem reinen GitHub-Pages-Hosting.
 //
-// Die amtlichen Warnungen (NINA/BBK) sind die eine Ausnahme: deren API hat
-// kein CORS und lässt sich daher nicht per Browser-Fetch abrufen. Sie werden
-// stattdessen HIER, im Astro-Frontmatter, beim Bauen der Seite geladen
-// (serverseitig in Node — CORS betrifft nur Browser) und als fertiges HTML
-// ausgeliefert. Der GitHub-Actions-Workflow baut die Seite deshalb auch nach
-// einem Zeitplan neu, damit die Warnungen halbwegs aktuell bleiben.
+// Die amtlichen Warnungen (NINA/BBK) sind die eine Ausnahme: deren API sendet
+// keinen Access-Control-Allow-Origin-Header, der Browser gibt die Antwort
+// wegen der Same-Origin-Policy also nicht frei. Sie werden stattdessen HIER,
+// im Astro-Frontmatter, zur Build-Zeit in Node.js geladen (dort gilt die
+// Same-Origin-Policy nicht) und als JSON in die statische Seite eingebettet.
+// Das ist kein Backend: der Code läuft nur einmal pro Build. Der
+// GitHub-Actions-Workflow baut die Seite zusätzlich nach Zeitplan neu; GitHub
+// führt diese Läufe aber nicht garantiert pünktlich aus, daher zeigt das
+// Frontend das Alter der Warnungen an (siehe dashboard.js).
+
+import pkg from "../../package.json";
 
 const NINA_AGS = "110000000000"; // Berlin, Bundesland-Ebene
 const NINA_LANGS = ["de", "en", "fr", "pl", "es"] as const;
@@ -87,23 +92,41 @@ try {
 	warningsError = true;
 }
 
-if (process.env.DASHBOARD_TEST_WARNING === "1") {
-	const testBlock: WarningLangBlock = {
-		headline: "Amtliche WARNUNG vor STURMBÖEN",
-		description: "Es treten Sturmböen mit Geschwindigkeiten um 65 km/h auf.",
-		instruction: "Objekte sichern.<br/>Vorsicht bei herabfallenden Ästen.",
-		senderName: "Deutscher Wetterdienst",
-	};
-	warnings = [
-		{
-			id: "test-1",
-			severity: "Severe",
-			onset: new Date().toISOString(),
-			expires: new Date(Date.now() + 3600_000).toISOString(),
-			areaDesc: "Berlin",
-			langs: { de: testBlock, en: testBlock, fr: testBlock, pl: testBlock, es: testBlock },
-		},
+// Schalter für Beispielwarnungen, aus der Shell oder aus einer .env-Datei
+// (Vorlage: .env.example). trim(), weil `set VAR=1 && …` unter Windows-CMD
+// das Leerzeichen vor && mit in den Wert übernimmt.
+const testWarningFlag = String(import.meta.env.DASHBOARD_TEST_WARNING ?? process.env.DASHBOARD_TEST_WARNING ?? "").trim();
+// Wert = Anzahl der Beispielwarnungen (1–3), z. B. um das Blättern zu testen.
+const testWarningCount = Math.min(Math.max(Number.parseInt(testWarningFlag, 10) || 0, 0), 3);
+if (testWarningCount > 0) {
+	const TEST_WARNINGS: Array<[string, WarningLangBlock]> = [
+		["Severe", {
+			headline: "Amtliche WARNUNG vor STURMBÖEN",
+			description: "Es treten Sturmböen mit Geschwindigkeiten um 65 km/h auf.",
+			instruction: "Objekte sichern.<br/>Vorsicht bei herabfallenden Ästen.",
+			senderName: "Deutscher Wetterdienst",
+		}],
+		["Moderate", {
+			headline: "Amtliche WARNUNG vor STARKREGEN",
+			description: "Es tritt Starkregen mit Niederschlagsmengen zwischen 15 l/m² und 25 l/m² pro Stunde auf. Örtlich kann es Blitzschlag geben.",
+			instruction: "Unterführungen und Keller meiden.<br/>Gegenstände vor Überflutung schützen.",
+			senderName: "Deutscher Wetterdienst",
+		}],
+		["Minor", {
+			headline: "Amtliche WARNUNG vor FROST",
+			description: "Es tritt leichter Frost um -2 °C auf. In Bodennähe wird leichter Frost um -4 °C erwartet.",
+			instruction: "",
+			senderName: "Deutscher Wetterdienst",
+		}],
 	];
+	warnings = TEST_WARNINGS.slice(0, testWarningCount).map(([severity, block], i) => ({
+		id: `test-${i + 1}`,
+		severity,
+		onset: new Date().toISOString(),
+		expires: new Date(Date.now() + (i + 1) * 3600_000).toISOString(),
+		areaDesc: "Berlin",
+		langs: { de: block, en: block, fr: block, pl: block, es: block },
+	}));
 	warningsError = false;
 }
 
@@ -121,7 +144,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap" />
-	<title>Dashboard für den Katastrophenschutz Berlin</title>
+	<title>Lagebild-Dashboard · Katastrophenschutz Berlin</title>
 </head>
 <body>
 	<svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -138,6 +161,8 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M18 13l-6 6-6-6"/></symbol>
 			<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.6"/><path d="M12 2.5v2.4M12 19v2.4M4.2 12H1.8M22.2 12h-2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7"/></symbol>
 			<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 18h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 18z"/></symbol>
+			<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+			<symbol id="i-cloud-moon" viewBox="0 0 24 24"><path d="M12.5 7.2A4.2 4.2 0 0 1 7.3 2.5a4.6 4.6 0 0 0-3.9 6.3"/><path d="M9.5 20h9a3.3 3.3 0 0 0 .4-6.6 4.6 4.6 0 0 0-8.8-1.4A3.3 3.3 0 0 0 9.5 20z"/></symbol>
 			<symbol id="i-cloud-sun" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M8 2.6v1.6M8 12v0M3.4 8H2M13.6 6.5 12.3 7.7M3.7 3.7 5 5"/><path d="M9.5 20h9a3.3 3.3 0 0 0 .4-6.6 4.6 4.6 0 0 0-8.8-1.4A3.3 3.3 0 0 0 9.5 20z"/></symbol>
 			<symbol id="i-rain" viewBox="0 0 24 24"><path d="M6.5 14h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 14z"/><path d="M8 18.5 7 21M12 18.5l-1 2.5M16 18.5l-1 2.5"/></symbol>
 			<symbol id="i-snow" viewBox="0 0 24 24"><path d="M6.5 13h11a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 6.5 13z"/><path d="M8 17v5M6 18.5l4 2M10 18.5l-4 2M16 17v5M14 18.5l4 2M18 18.5l-4 2"/></symbol>
@@ -211,13 +236,12 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				<div class="status" id="weatherStatus" data-i18n="loading">Lädt …</div>
 			</section>
 
-			<section class="stat s-pegel" aria-label="Pegelstand Spree Berlin-Köpenick, 48-Stunden-Verlauf" data-i18n-aria="pegelAriaLabel">
+			<section class="stat s-pegel" aria-label="Pegelstand Spree Berlin-Köpenick mit Einordnung" data-i18n-aria="pegelAriaLabel">
 				<div class="k"><svg class="ic"><use href="#i-drop"/></svg><span data-i18n="pegelLabel">Pegel Spree · Köpenick</span></div>
-				<div class="v" id="pegelValue">-- cm</div>
+				<div class="v pegel-head"><span id="pegelValue">-- cm</span><span class="pegel-zone" id="pegelZone" hidden></span></div>
 				<div class="sub" id="pegelTrend" data-i18n="loading">Lädt …</div>
-				<div class="mini-chart">
+				<div class="mini-chart pegel-gauge">
 					<svg id="pegelChart" aria-hidden="true"></svg>
-					<div id="pegelTooltip" class="chart-tooltip" hidden></div>
 				</div>
 				<div class="sub muted" id="pegelTime"></div>
 			</section>
@@ -240,7 +264,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				<div class="sub muted">…</div>
 			</button>
 
-			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf">
+			<section class="chart-box" aria-label="24-Stunden-Temperaturverlauf" data-i18n-aria="weatherChartAria">
 				<div class="chart-head"><span data-i18n="chart24h">24-Std.-Verlauf</span><b id="chartNow">--°</b></div>
 				<div class="chart-wrap">
 					<svg id="weatherChart" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -248,7 +272,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				</div>
 			</section>
 
-			<section class="stat s-resptime" aria-label="Durchschnittliche Reaktionszeit der Feuerwehr, letzte 30 Tage">
+			<section class="stat s-resptime" aria-label="Durchschnittliche Reaktionszeit der Feuerwehr, letzte 30 Tage" data-i18n-aria="respAriaLabel">
 				<div class="k"><svg class="ic"><use href="#i-stopwatch"/></svg><span data-i18n="respLabel">Ø Reaktionszeit (30 Tage)</span></div>
 				<div class="v"><span id="respTimeValue">--</span></div>
 				<div class="sub" data-i18n="respSub">Eintreffen 1. Löschfahrzeug</div>
@@ -259,7 +283,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			</section>
 
 			<div class="stack-col" style="grid-area: total;">
-				<section class="stat tile-half" aria-label="Gesamteinsätze der Berliner Feuerwehr, Vortag">
+				<section class="stat tile-half" aria-label="Gesamteinsätze der Berliner Feuerwehr, Vortag" data-i18n-aria="missionsAriaLabel">
 					<div class="k"><svg class="ic"><use href="#i-siren"/></svg><span data-i18n="totalLabel">Gesamteinsätze</span></div>
 					<div class="v"><span id="totalMissionsValue">--</span></div>
 					<div class="sub"><span data-i18n="allCategories">alle Kategorien</span> · <span data-i18n="amPrefix">am</span> <span id="fireDate2">--</span></div>
@@ -341,8 +365,8 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				<img class="hazard-layer" src="https://gdi.berlin.de/services/wms/ua_hochwassergefahrenkarten?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=c_hwgk_niedrig,b_hwgk_mittel,a_hwgk_hoch&STYLES=,,&CRS=EPSG:4326&BBOX=52.33,13.08,52.68,13.76&WIDTH=900&HEIGHT=763&FORMAT=image/png&TRANSPARENT=TRUE" alt="Hochwassergefahrenkarte (Umweltatlas Berlin)" loading="lazy" />
 			</div>
 			<p class="warn-footnote">
-				<span data-i18n="hazardSourcePrefix">Quelle:</span> <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a>
-				(<span data-i18n="hazardSourceOrg">Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen</span>) · <span data-i18n="hazardStaticNote">statische amtliche Gefahrenkarte, keine Live-Daten zu einem laufenden Einsatz</span> ·
+				<span data-i18n="hazardSourcePrefix">Quelle:</span> <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a>{" "}
+				(<span data-i18n="hazardSourceOrg">Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen</span>) · <span data-i18n="hazardStaticNote">statische amtliche Gefahrenkarte, keine Live-Daten zu einem laufenden Einsatz</span> ·{" "}
 				<a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener" data-i18n="hazardFullMapLink">Vollständige interaktive Karte öffnen ↗</a>
 			</p>
 		</div>
@@ -368,9 +392,10 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				<li data-i18n="helpUsage1">Die Kacheln zeigen den aktuellen Stand automatisch an — nichts muss angeklickt werden, um Werte zu sehen.</li>
 				<li data-i18n="helpUsage2">„Warnungen", „Gefahrenkarte" und jeder Tag in der 7-Tage-Vorhersage sind anklickbar und öffnen weitere Details.</li>
 				<li data-i18n="helpUsage3">Wetter, Pegel, Brände und Luftqualität aktualisieren sich automatisch alle 5 Minuten, die Uhrzeit jede Sekunde — ein Neuladen der Seite ist dafür nicht nötig.</li>
-				<li data-i18n="helpUsage4">Amtliche Warnungen werden beim Bauen der Seite geladen und können bis zu 30 Minuten alt sein; bei einem lange geöffneten Tab hilft ein Neuladen der Seite.</li>
+				<li data-i18n="helpUsage4">Amtliche Warnungen werden nur beim automatischen Neubau der Seite geladen. Das passiert mehrmals täglich, aber nicht zu festen Zeiten – die Warnungen können daher mehrere Stunden alt sein. Ihr Alter steht in der Kachel; ab einer Stunde erscheint ein Hinweis.</li>
 				<li data-i18n="helpUsage5">Auf einem Leitstellen-Monitor passt alles ohne Scrollen auf einen Bildschirm; auf Tablet/Smartphone lässt sich die Seite normal scrollen.</li>
 				<li data-i18n="helpUsage6">Über den Barrierefreiheit-Knopf (Symbol daneben) lassen sich Sprache, hoher Kontrast und eine Sprachausgabe der Lage einstellen.</li>
+				<li data-i18n="helpUsage7">Alles ist auch per Tastatur bedienbar: Tab wechselt zwischen den Knöpfen, Enter öffnet Details, Esc schließt ein Fenster wieder.</li>
 			</ul>
 					</div>
 
@@ -394,7 +419,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				</li>
 				<li>
 					<strong data-i18n="pegelLabel">Pegel Spree · Köpenick</strong> — <a href="https://www.pegelonline.wsv.de" target="_blank" rel="noopener">PEGELONLINE (WSV)</a>
-					<span class="source-reason" data-i18n="helpSrc2Reason">Der örtliche Wasserstand mit Verlauf und Tendenz hilft, die Hochwasserlage an der Spree einzuschätzen.</span>
+					<span class="source-reason" data-i18n="helpSrc2Reason">Der örtliche Wasserstand, eingeordnet an den amtlichen Kennwerten: NNW/HHW = niedrigster/höchster je gemessener Stand, MW = Mittelwasser, MHW = mittleres Hochwasser.</span>
 				</li>
 				<li>
 					<strong data-i18n="helpSrc3Label">Brände, Gesamteinsätze, Reaktionszeit</strong> — <a href="https://github.com/Berliner-Feuerwehr/BF-Open-Data" target="_blank" rel="noopener">Berliner Feuerwehr – Open Data</a>
@@ -408,7 +433,12 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 					<strong data-i18n="hazardLabel">Gefahrenkarte</strong> — <a href="https://www.berlin.de/umweltatlas/en/water/flood/" target="_blank" rel="noopener">Umweltatlas Berlin</a>
 					<span class="source-reason" data-i18n="helpSrc5Reason">Die amtliche Karte ergänzt den aktuellen Pegel um langfristige Hochwasserrisikogebiete; sie zeigt keine Live-Einsätze.</span>
 				</li>
+				<li>
+					<strong data-i18n="helpSrc6Label">Sprachausgabe (falls der Browser keine eigene Stimme hat)</strong> — <a href="https://github.com/rhasspy/piper" target="_blank" rel="noopener">Piper TTS</a>
+					<span class="source-reason" data-i18n="helpSrc6Reason">Sprachmodelle, die direkt im Browser laufen. Stimmen: thorsten, cori, gosia, davefx (gemeinfrei/CC0) und siwis (CC BY 4.0, SIWIS-Datensatz, University of Edinburgh).</span>
+				</li>
 			</ul>
+			<p class="help-version">Lagebild-Dashboard · <span data-i18n="versionLabel">Version</span> {pkg.version}</p>
 				</section>
 			</div>
 		</div>
@@ -453,6 +483,11 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				<button type="button" class="a11y-speak-btn" id="speakBtn">
 					<svg class="ic"><use href="#i-volume"/></svg>
 					<span id="speakBtnLabel" data-i18n="a11ySpeak">Lagebericht vorlesen</span>
+				</button>
+				<p class="a11y-speak-hint" id="speakHint" role="status" hidden></p>
+				<button type="button" class="a11y-speak-btn a11y-download-btn" id="speakDownloadBtn" hidden>
+					<svg class="ic"><use href="#i-down"/></svg>
+					<span id="speakDownloadLabel">Stimme herunterladen</span>
 				</button>
 			</div>
 		</div>
@@ -560,7 +595,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		   Gewinn durch die hellere --muted-Farbe wieder. */
 		:root[data-high-contrast] .status,
 		:root[data-high-contrast] .stat .sub.muted,
-		:root[data-high-contrast] .warn-meta,
+		:root[data-high-contrast] :global(.warn-meta),
 		:root[data-high-contrast] .warn-footnote {
 			opacity: 0.92;
 		}
@@ -568,15 +603,15 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 		/* Warnstufen-Badges bekommen zusätzlich einen Rahmen in ihrer eigenen
 		   Farbe (currentColor), statt sich nur auf die leicht eingefärbte
 		   Fläche zu verlassen. */
-		:root[data-high-contrast] .warn-badge {
+		:root[data-high-contrast] :global(.warn-badge) {
 			box-shadow: inset 0 0 0 1.5px currentColor;
 		}
 
-		:root[data-high-contrast] .warn-dot {
+		:root[data-high-contrast] :global(.warn-dot) {
 			box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
 		}
 
-		:root[data-theme="light"][data-high-contrast] .warn-dot {
+		:root[data-theme="light"][data-high-contrast] :global(.warn-dot) {
 			box-shadow: 0 0 0 1px #111111;
 		}
 
@@ -810,6 +845,38 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			--icon-color: var(--series-pegel);
 		}
 
+		.pegel-head {
+			display: flex;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 4px 10px;
+		}
+
+		/* Einordnung des Pegels; Farben aus den Statusfarben, damit Hell-,
+		   Dunkel- und Kontrastmodus automatisch mitziehen. */
+		.pegel-zone {
+			font-size: 11.5px;
+			font-weight: 800;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			border: 1.5px solid currentColor;
+			border-radius: 999px;
+			padding: 1px 9px;
+		}
+
+		.pegel-zone.is-low { color: var(--muted); }
+		.pegel-zone.is-normal { color: var(--status-good); }
+		.pegel-zone.is-raised { color: var(--status-warning); }
+		.pegel-zone.is-high { color: var(--status-serious); }
+		.pegel-zone.is-record { color: var(--status-critical); }
+
+		.pegel-gauge :global(.pegel-zone-fill.is-low) { fill: color-mix(in srgb, var(--muted) 18%, transparent); }
+		.pegel-gauge :global(.pegel-zone-fill.is-normal) { fill: color-mix(in srgb, var(--status-good) 22%, transparent); }
+		.pegel-gauge :global(.pegel-zone-fill.is-raised) { fill: color-mix(in srgb, var(--status-warning) 26%, transparent); }
+		.pegel-gauge :global(.pegel-zone-fill.is-high) { fill: color-mix(in srgb, var(--status-serious) 32%, transparent); }
+		.pegel-gauge :global(.pegel-zone-fill.is-record) { fill: color-mix(in srgb, var(--status-critical) 32%, transparent); }
+		.pegel-gauge :global(.pegel-ground) { fill: color-mix(in srgb, var(--muted) 16%, transparent); }
+
 		.stat.s-fire {
 			grid-area: fire;
 			--icon-color: var(--series-fire);
@@ -836,6 +903,15 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			min-height: 0;
 			--icon-color: var(--muted);
 			justify-content: center;
+		}
+
+		/* Niedrige Laptop-Bildschirme (z. B. 1366×768) im No-Scroll-Layout: die
+		   halben Kacheln brauchen sonst ~10 px mehr Höhe, als sie bekommen. */
+		@media (min-width: 1101px) and (min-height: 761px) and (max-height: 800px) {
+			.stat.tile-half {
+				padding-block: 4px;
+				gap: 0;
+			}
 		}
 
 		.missions-comparison {
@@ -948,12 +1024,12 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			margin: 0;
 		}
 
-		.warn-preview .warn-updated {
+		.warn-preview :global(.warn-updated) {
 			margin-top: auto;
 			font-size: 11px;
 		}
 
-		.warn-preview-item {
+		:global(.warn-preview-item) {
 			display: flex;
 			align-items: flex-start;
 			gap: 7px;
@@ -963,7 +1039,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			color: var(--text) !important;
 		}
 
-		.warn-dot {
+		:global(.warn-dot) {
 			width: 7px;
 			height: 7px;
 			border-radius: 50%;
@@ -972,16 +1048,16 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			background: var(--muted);
 		}
 
-		.warn-dot.aqi-good {
+		:global(.warn-dot.aqi-good) {
 			background: var(--status-good);
 		}
-		.warn-dot.aqi-warning {
+		:global(.warn-dot.aqi-warning) {
 			background: var(--status-warning);
 		}
-		.warn-dot.aqi-serious {
+		:global(.warn-dot.aqi-serious) {
 			background: var(--status-serious);
 		}
-		.warn-dot.aqi-critical {
+		:global(.warn-dot.aqi-critical) {
 			background: var(--status-critical);
 		}
 
@@ -1350,30 +1426,30 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			padding-right: 30px;
 		}
 
-		.warn-empty {
+		:global(.warn-empty) {
 			color: var(--muted);
 			font-size: 14px;
 			line-height: 1.5;
 		}
 
-		.warn-empty a {
+		:global(.warn-empty a) {
 			color: var(--series-weather);
 		}
 
-		.warn-list {
+		:global(.warn-list) {
 			display: flex;
 			flex-direction: column;
 			gap: 12px;
 		}
 
-		.warn-card {
+		:global(.warn-card) {
 			background: var(--bg);
 			box-shadow: var(--shadow-in);
 			border-radius: 16px;
 			padding: 14px 16px;
 		}
 
-		.warn-card-head {
+		:global(.warn-card-head) {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
@@ -1381,7 +1457,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			margin-bottom: 8px;
 		}
 
-		.warn-badge {
+		:global(.warn-badge) {
 			font-size: 11px;
 			font-weight: 800;
 			letter-spacing: 0.03em;
@@ -1390,49 +1466,49 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			border-radius: 999px;
 		}
 
-		.warn-badge.aqi-good {
+		:global(.warn-badge.aqi-good) {
 			background: color-mix(in srgb, var(--status-good) 18%, transparent);
 			color: var(--status-good);
 		}
-		.warn-badge.aqi-warning {
+		:global(.warn-badge.aqi-warning) {
 			background: color-mix(in srgb, var(--status-warning) 18%, transparent);
 			color: var(--status-warning);
 		}
-		.warn-badge.aqi-serious {
+		:global(.warn-badge.aqi-serious) {
 			background: color-mix(in srgb, var(--status-serious) 18%, transparent);
 			color: var(--status-serious);
 		}
-		.warn-badge.aqi-critical {
+		:global(.warn-badge.aqi-critical) {
 			background: color-mix(in srgb, var(--status-critical) 20%, transparent);
 			color: var(--status-critical);
 		}
 
-		.warn-time {
+		:global(.warn-time) {
 			font-size: 11.5px;
 			color: var(--muted);
 			white-space: nowrap;
 		}
 
-		.warn-card h3 {
+		:global(.warn-card h3) {
 			font-size: 15px;
 			font-weight: 800;
 			margin-bottom: 6px;
 			text-wrap: balance;
 		}
 
-		.warn-desc,
-		.warn-instr {
+		:global(.warn-desc),
+		:global(.warn-instr) {
 			font-size: 13.5px;
 			color: var(--text);
 			line-height: 1.5;
 			margin-bottom: 8px;
 		}
 
-		.warn-instr {
+		:global(.warn-instr) {
 			color: var(--muted);
 		}
 
-		.warn-meta {
+		:global(.warn-meta) {
 			font-size: 11.5px;
 			color: var(--muted);
 			opacity: 0.8;
@@ -1444,6 +1520,19 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			color: var(--muted);
 			opacity: 0.7;
 			line-height: 1.4;
+		}
+
+		/* Veralteter Warnungen-Stand (älter als WARN_STALE_MINUTES, siehe
+		   dashboard.js): bewusst auffällig in der Warnfarbe. */
+		.warn-preview :global(.warn-updated.is-stale),
+		.warn-footnote :global(.warn-stale-note) {
+			color: var(--status-warning);
+			font-weight: 700;
+		}
+
+		.warn-footnote :global(.warn-stale-note) {
+			display: block;
+			margin-top: 6px;
 		}
 
 		.warn-footnote a {
@@ -1621,6 +1710,35 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			cursor: not-allowed;
 		}
 
+		.a11y-speak-btn.is-loading {
+			cursor: progress;
+			font-variant-numeric: tabular-nums;
+		}
+
+		/* Download-Knopf: zweitrangig neben dem Vorlesen, daher als Umriss. */
+		.a11y-download-btn {
+			margin-top: 8px;
+			background: transparent;
+			color: var(--text);
+			box-shadow: inset 0 0 0 1.5px var(--series-pegel);
+		}
+
+		.a11y-download-btn.is-loading,
+		.a11y-download-btn.is-loading:disabled {
+			opacity: 1;
+		}
+
+		.a11y-download-btn[hidden] {
+			display: none;
+		}
+
+		.a11y-speak-hint {
+			margin: 8px 0 0;
+			font-size: 12.5px;
+			line-height: 1.4;
+			color: var(--muted);
+		}
+
 		/* ---------- Kurzanleitung & Quellen ---------- */
 
 		.help-panel-box {
@@ -1694,6 +1812,12 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			font-size: 15px;
 			color: var(--text);
 			line-height: 1.4;
+		}
+
+		.help-version {
+			margin: 14px 0 0;
+			font-size: 12px;
+			color: var(--muted);
 		}
 
 		.help-emergency {
@@ -1826,25 +1950,266 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 
 		/* ---------- Responsive: Tablet ---------- */
 
-		/* Bei Browser-Zoom kann die nutzbare Höhe knapp werden, obwohl das
-		   Desktop-Raster noch aktiv ist. Dann Inhalte nicht in Kacheln abschneiden. */
+		/* Desktop scrollt nie (Leitstellen-Monitor, Vorgabe der Lernsituation) —
+		   auch nicht bei wenig Höhe, z. B. 1280×720 oder 150 % Browser-Zoom.
+		   Stattdessen wird das Raster kompakter. */
 		@media (max-height: 760px) and (min-width: 1101px) {
-			html,
-			body {
-				height: auto;
-				min-height: 100%;
-				overflow-x: hidden;
-				overflow-y: auto;
-			}
-
 			.screen {
-				height: auto;
-				min-height: 100dvh;
+				padding: 10px 18px;
 			}
 
 			.layout {
-				height: auto;
-				grid-template-rows: auto minmax(300px, auto) minmax(200px, auto) auto;
+				gap: 10px;
+			}
+
+			.hero-block {
+				padding: 12px 18px;
+				gap: 4px;
+			}
+
+			.temp-big {
+				font-size: clamp(2rem, 3.4vw, 3rem);
+			}
+
+			.hero-icon {
+				width: 42px;
+				height: 42px;
+			}
+
+			.chips {
+				gap: 5px;
+				margin-top: 2px;
+			}
+
+			.chip {
+				padding: 3px 9px;
+			}
+
+			.stat {
+				padding: 10px 14px;
+				gap: 2px;
+			}
+
+			.stat.tile-half {
+				padding-block: 6px;
+				gap: 0;
+			}
+
+			.stat.tile-half .v {
+				font-size: 1.3rem;
+			}
+
+			.missions-comparison {
+				font-size: 11px;
+			}
+
+			.forecast :global(.day) {
+				padding: 6px 4px 5px;
+			}
+
+			.forecast :global(.d) {
+				margin-bottom: 2px;
+			}
+
+			.forecast :global(.ic) {
+				width: 18px;
+				height: 18px;
+				margin-bottom: 2px;
+			}
+		}
+
+		/* Fenster scrollen auf Desktop ebenfalls nie: Sie sind auf die
+		   Bildschirmhöhe begrenzt und passen ihren Inhalt an. */
+		@media (min-width: 1101px) {
+			.day-modal-panel {
+				max-height: calc(100dvh - 32px);
+				overflow: hidden;
+			}
+
+			/* Gefahrenkarte: Die Karte schrumpft, wenn die Höhe nicht reicht.
+			   Startgröße = volle Breite im Seitenverhältnis 900 × 763. */
+			.hazard-modal-panel {
+				display: flex;
+				flex-direction: column;
+			}
+
+			.hazard-modal-panel h2,
+			.hazard-sub,
+			.hazard-modal-panel .warn-footnote {
+				flex-shrink: 0;
+			}
+
+			.hazard-map-wrap {
+				aspect-ratio: auto;
+				flex: 0 1 calc((min(720px, 100vw - 40px) - 48px) * 763 / 900);
+				min-height: 140px;
+			}
+
+			.hazard-layer {
+				object-fit: contain;
+			}
+
+			.lang-buttons {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+			}
+		}
+
+		/* Kurzanleitung: Reicht die Höhe nicht für Anleitung und Quellen
+		   zusammen, werden sie wie mobil auf zwei Reiter verteilt. */
+		@media (min-width: 1101px) and (max-height: 820px) {
+			.help-tabs {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+				margin-bottom: 12px;
+				flex-shrink: 0;
+			}
+
+			.help-tab {
+				font: inherit;
+				font-size: 13px;
+				padding: 8px 6px;
+				border: 0;
+				border-radius: 8px;
+				background: var(--bg);
+				color: var(--muted);
+				box-shadow: var(--shadow-in);
+				cursor: pointer;
+			}
+
+			.help-tab.is-active {
+				color: var(--series-pegel);
+				font-weight: 700;
+				box-shadow: inset 0 -2px 0 var(--series-pegel);
+			}
+
+			.help-layout {
+				display: block;
+			}
+
+			.help-sources-section {
+				border-top: none;
+				padding-top: 0;
+			}
+
+			.help-overview:not(.is-active),
+			.help-sources-section:not(.is-active) {
+				display: none;
+			}
+		}
+
+		:global(.warn-pager) {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 10px;
+			margin-bottom: 12px;
+			font-size: 13px;
+			color: var(--muted);
+			font-variant-numeric: tabular-nums;
+		}
+
+		:global(.warn-pager-btn) {
+			font: inherit;
+			font-size: 18px;
+			line-height: 1;
+			width: 36px;
+			height: 32px;
+			border: none;
+			border-radius: 10px;
+			background: var(--bg);
+			box-shadow: var(--shadow-in);
+			color: var(--text);
+			cursor: pointer;
+		}
+
+		:global(.warn-pager-btn:disabled) {
+			opacity: 0.35;
+			cursor: default;
+		}
+
+		/* Noch weniger Höhe, z. B. 1366×768-Laptop abzüglich Browser- und
+		   Taskleiste (≈ 650 px sichtbar). */
+		@media (max-height: 660px) and (min-width: 1101px) {
+			.screen {
+				padding: 8px 16px;
+			}
+
+			.layout {
+				gap: 8px;
+			}
+
+			.hero-block {
+				padding: 8px 16px;
+				gap: 2px;
+			}
+
+			.temp-big {
+				font-size: clamp(1.7rem, 2.8vw, 2.4rem);
+			}
+
+			.hero-icon {
+				width: 34px;
+				height: 34px;
+			}
+
+			.cond {
+				font-size: 14px;
+			}
+
+			.minmax {
+				font-size: 12.5px;
+			}
+
+			.chip {
+				padding: 2px 8px;
+				font-size: 11px;
+			}
+
+			.stat {
+				padding: 8px 12px;
+			}
+
+			.stat .k {
+				font-size: 10.5px;
+			}
+
+			.stat .v {
+				font-size: 1.25rem;
+			}
+
+			.stat .sub {
+				font-size: 11.5px;
+			}
+
+			.stat.tile-half {
+				padding-block: 4px;
+			}
+
+			.stat.tile-half .v {
+				font-size: 1.1rem;
+			}
+
+			.missions-comparison {
+				font-size: 10.5px;
+				margin-top: 0;
+			}
+
+			.forecast :global(.day) {
+				padding: 4px 4px 3px;
+				border-radius: 12px;
+			}
+
+			.forecast :global(.d) {
+				font-size: 11px;
+				margin-bottom: 1px;
+			}
+
+			.forecast :global(.ic) {
+				width: 16px;
+				height: 16px;
+				margin-bottom: 1px;
 			}
 		}
 
@@ -1988,11 +2353,11 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				gap: 14px;
 			}
 
-			.warn-preview-item {
+			:global(.warn-preview-item) {
 				font-size: 1.05rem !important;
 			}
 
-			.warn-dot {
+			:global(.warn-dot) {
 				width: 10px;
 				height: 10px;
 				margin-top: 8px;
@@ -2089,11 +2454,11 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				margin: 8px 0 0;
 			}
 
-			.warn-preview-item {
+			:global(.warn-preview-item) {
 				font-size: 1.1rem !important;
 			}
 
-			.warn-preview .warn-updated {
+			.warn-preview :global(.warn-updated) {
 				font-size: 0.95rem;
 			}
 
@@ -2188,31 +2553,31 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				font-size: 1.5rem;
 			}
 
-			.warn-list {
+			:global(.warn-list) {
 				gap: 16px;
 			}
 
-			.warn-card {
+			:global(.warn-card) {
 				padding: 20px 22px;
 				border-radius: 12px;
 			}
 
-			.warn-badge {
+			:global(.warn-badge) {
 				font-size: 0.85rem;
 				padding: 5px 12px;
 			}
 
-			.warn-time,
-			.warn-meta {
+			:global(.warn-time),
+			:global(.warn-meta) {
 				font-size: 0.9rem;
 			}
 
-			.warn-card h3 {
+			:global(.warn-card h3) {
 				font-size: 1.3rem;
 			}
 
-			.warn-desc,
-			.warn-instr {
+			:global(.warn-desc),
+			:global(.warn-instr) {
 				font-size: 1.1rem;
 			}
 
@@ -2411,7 +2776,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 			}
 
 			.help-panel-box {
-				width: min(1220px, 100%);
+				width: min(1400px, 100%);
 				padding: 28px 34px 26px;
 			}
 
@@ -2538,7 +2903,7 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				font-size: 1.2rem;
 			}
 
-			.warn-preview-item {
+			:global(.warn-preview-item) {
 				font-size: 1.2rem !important;
 			}
 
@@ -2625,21 +2990,21 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				font-size: 1.7rem;
 			}
 
-			.warn-card {
+			:global(.warn-card) {
 				padding: 24px 28px;
 			}
 
-			.warn-card h3 {
+			:global(.warn-card h3) {
 				font-size: 1.45rem;
 			}
 
-			.warn-desc,
-			.warn-instr {
+			:global(.warn-desc),
+			:global(.warn-instr) {
 				font-size: 1.25rem;
 			}
 
-			.warn-time,
-			.warn-meta,
+			:global(.warn-time),
+			:global(.warn-meta),
 			.warn-footnote {
 				font-size: 1rem;
 			}
@@ -2722,6 +3087,11 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 				height: 110px;
 			}
 
+			/* Die Pegellatte braucht mehr Höhe als ein Verlaufsdiagramm. */
+			.mini-chart.pegel-gauge {
+				height: 220px;
+			}
+
 			.chart-box {
 				height: 220px;
 				padding: 14px 18px 10px;
@@ -2796,6 +3166,10 @@ const warningsDataJson = JSON.stringify({ warnings, warningsError, buildStamp })
 
 			.mini-chart {
 				height: 90px;
+			}
+
+			.mini-chart.pegel-gauge {
+				height: 200px;
 			}
 
 			.chart-box {

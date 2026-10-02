@@ -63,13 +63,47 @@ export const STRINGS = {
     de: "Luftqualität", en: "Air quality", fr: "Qualité de l'air", pl: "Jakość powietrza", es: "Calidad del aire",
   },
 
-  pegelAriaLabel: {
-    de: "Pegelstand Spree Berlin-Köpenick, 48-Stunden-Verlauf",
-    en: "Spree water level Berlin-Köpenick, 48-hour trend",
-    fr: "Niveau de la Spree à Berlin-Köpenick, tendance sur 48 heures",
-    pl: "Poziom wody Spree Berlin-Köpenick, trend 48-godzinny",
-    es: "Nivel del río Spree en Berlín-Köpenick, tendencia de 48 horas",
+  documentTitle: {
+    de: "Lagebild-Dashboard · Katastrophenschutz Berlin",
+    en: "Lagebild-Dashboard · Berlin Civil Protection",
+    fr: "Lagebild-Dashboard · Protection civile de Berlin",
+    pl: "Lagebild-Dashboard · Ochrona ludności Berlina",
+    es: "Lagebild-Dashboard · Protección civil de Berlín",
   },
+  versionLabel: { de: "Version", en: "Version", fr: "Version", pl: "Wersja", es: "Versión" },
+  weatherChartAria: {
+    de: "24-Stunden-Temperaturverlauf",
+    en: "24-hour temperature trend",
+    fr: "Évolution de la température sur 24 heures",
+    pl: "Przebieg temperatury z 24 godzin",
+    es: "Evolución de la temperatura en 24 horas",
+  },
+  respAriaLabel: {
+    de: "Durchschnittliche Reaktionszeit der Feuerwehr, letzte 30 Tage",
+    en: "Average fire brigade response time, last 30 days",
+    fr: "Temps d'intervention moyen des pompiers, 30 derniers jours",
+    pl: "Średni czas reakcji straży pożarnej, ostatnie 30 dni",
+    es: "Tiempo medio de respuesta de los bomberos, últimos 30 días",
+  },
+  missionsAriaLabel: {
+    de: "Gesamteinsätze der Berliner Feuerwehr, Vortag",
+    en: "Total Berlin Fire Brigade operations, previous day",
+    fr: "Total des interventions des pompiers de Berlin, veille",
+    pl: "Łączna liczba interwencji berlińskiej straży pożarnej, poprzedni dzień",
+    es: "Total de intervenciones de los bomberos de Berlín, día anterior",
+  },
+  pegelAriaLabel: {
+    de: "Pegelstand Spree Berlin-Köpenick mit Einordnung",
+    en: "Spree water level Berlin-Köpenick with classification",
+    fr: "Niveau de la Spree à Berlin-Köpenick avec classement",
+    pl: "Poziom wody Szprewy Berlin-Köpenick z oceną",
+    es: "Nivel del río Spree en Berlín-Köpenick con clasificación",
+  },
+  pegelZone_low: { de: "niedrig", en: "low", fr: "bas", pl: "niski", es: "bajo" },
+  pegelZone_normal: { de: "normal", en: "normal", fr: "normal", pl: "normalny", es: "normal" },
+  pegelZone_raised: { de: "erhöht", en: "elevated", fr: "élevé", pl: "podwyższony", es: "elevado" },
+  pegelZone_high: { de: "hoch", en: "high", fr: "haut", pl: "wysoki", es: "alto" },
+  pegelZone_record: { de: "Rekordnähe", en: "near record", fr: "proche du record", pl: "bliski rekordu", es: "cerca del récord" },
   pegelLabel: {
     de: "Pegel Spree · Köpenick", en: "Spree level · Köpenick", fr: "Niveau de la Spree · Köpenick",
     pl: "Poziom Spree · Köpenick", es: "Nivel del Spree · Köpenick",
@@ -182,6 +216,17 @@ export const STRINGS = {
     de: "Amtliche Warnungen · Berlin", en: "Official Warnings · Berlin", fr: "Alertes officielles · Berlin",
     pl: "Oficjalne ostrzeżenia · Berlin", es: "Avisos oficiales · Berlín",
   },
+  warnPageOf: {
+    de: "Warnung {i} von {n}", en: "Warning {i} of {n}", fr: "Alerte {i} sur {n}", pl: "Ostrzeżenie {i} z {n}",
+    es: "Aviso {i} de {n}",
+  },
+  warnPrev: {
+    de: "Vorherige Warnung", en: "Previous warning", fr: "Alerte précédente", pl: "Poprzednie ostrzeżenie",
+    es: "Aviso anterior",
+  },
+  warnNext: {
+    de: "Nächste Warnung", en: "Next warning", fr: "Alerte suivante", pl: "Następne ostrzeżenie", es: "Aviso siguiente",
+  },
   validUntil: { de: "gültig bis", en: "valid until", fr: "valable jusqu'au", pl: "obowiązuje do", es: "válido hasta" },
   warnSource: {
     de: "Quelle: NINA / Bund (warnung.bund.de)", en: "Source: NINA / Federal Government (warnung.bund.de)",
@@ -192,6 +237,20 @@ export const STRINGS = {
     de: "Stand des letzten Seiten-Builds", en: "As of the last page build",
     fr: "À la date de la dernière génération de la page", pl: "Stan z ostatniej kompilacji strony",
     es: "Estado de la última compilación de la página",
+  },
+  warnStaleTile: {
+    de: "Veraltet – aktuelle Lage auf warnung.bund.de prüfen",
+    en: "Outdated – check warnung.bund.de for the current situation",
+    fr: "Obsolète – vérifier la situation actuelle sur warnung.bund.de",
+    pl: "Nieaktualne – sprawdź bieżącą sytuację na warnung.bund.de",
+    es: "Desactualizado – consulta la situación actual en warnung.bund.de",
+  },
+  warnStaleModal: {
+    de: "Dieser Stand ist älter als eine Stunde. Neue Warnungen erscheinen hier erst nach dem nächsten automatischen Seiten-Build. Aktuelle Warnungen: <a href='https://warnung.bund.de' target='_blank' rel='noopener'>warnung.bund.de</a> oder NINA-App.",
+    en: "This data is more than an hour old. New warnings only appear here after the next automatic page build. Current warnings: <a href='https://warnung.bund.de' target='_blank' rel='noopener'>warnung.bund.de</a> or the NINA app.",
+    fr: "Ces données datent de plus d'une heure. Les nouvelles alertes n'apparaissent ici qu'après la prochaine génération automatique de la page. Alertes actuelles : <a href='https://warnung.bund.de' target='_blank' rel='noopener'>warnung.bund.de</a> ou l'application NINA.",
+    pl: "Te dane są starsze niż godzina. Nowe ostrzeżenia pojawią się tutaj dopiero po następnej automatycznej przebudowie strony. Aktualne ostrzeżenia: <a href='https://warnung.bund.de' target='_blank' rel='noopener'>warnung.bund.de</a> lub aplikacja NINA.",
+    es: "Estos datos tienen más de una hora. Los avisos nuevos solo aparecen aquí tras la próxima regeneración automática de la página. Avisos actuales: <a href='https://warnung.bund.de' target='_blank' rel='noopener'>warnung.bund.de</a> o la app NINA.",
   },
   warnModalError: {
     de: "Die Warnungen (NINA/BBK) konnten beim letzten Build der Seite nicht geladen werden. Das ist keine Aussage darüber, ob gerade eine Warnung besteht — bitte zusätzlich warnung.bund.de prüfen.",
@@ -252,6 +311,51 @@ export const STRINGS = {
     de: "Vorlesen stoppen", en: "Stop reading", fr: "Arrêter la lecture", pl: "Zatrzymaj odczytywanie",
     es: "Detener lectura",
   },
+  a11ySpeakLoading: {
+    de: "Stimme wird geladen …", en: "Loading voice …", fr: "Chargement de la voix …", pl: "Wczytywanie głosu …",
+    es: "Cargando la voz …",
+  },
+  a11ySpeakDownload: {
+    de: "Dieser Browser hat für diese Sprache keine eigene Stimme. Sie können einmalig eine Stimme herunterladen, die direkt im Browser läuft und danach gespeichert bleibt. Bei mobilen Daten auf das Datenvolumen achten.",
+    en: "This browser has no built-in voice for this language. You can download a voice once; it runs directly in the browser and stays saved afterwards. Mind your data allowance on mobile data.",
+    fr: "Ce navigateur n'a pas de voix intégrée pour cette langue. Vous pouvez télécharger une voix une seule fois ; elle fonctionne directement dans le navigateur et reste ensuite enregistrée. Attention au volume de données en connexion mobile.",
+    pl: "Ta przeglądarka nie ma wbudowanego głosu dla tego języka. Możesz jednorazowo pobrać głos, który działa bezpośrednio w przeglądarce i pozostaje zapisany. Przy danych mobilnych zwróć uwagę na limit transferu.",
+    es: "Este navegador no tiene una voz integrada para este idioma. Puedes descargar una voz una sola vez; funciona directamente en el navegador y queda guardada. Con datos móviles, ten en cuenta el consumo de datos.",
+  },
+  a11ySpeakDownloadBtn: {
+    de: "Stimme herunterladen (ca. {mb} MB)", en: "Download voice (about {mb} MB)",
+    fr: "Télécharger la voix (environ {mb} Mo)", pl: "Pobierz głos (ok. {mb} MB)", es: "Descargar la voz (unos {mb} MB)",
+  },
+  a11ySpeakPreparing: {
+    de: "Stimme wird vorbereitet …", en: "Preparing voice …", fr: "Préparation de la voix …", pl: "Przygotowywanie głosu …",
+    es: "Preparando la voz …",
+  },
+  a11ySpeakLoadError: {
+    de: "Die Stimme konnte nicht geladen werden. Bitte Internetverbindung prüfen und erneut versuchen.",
+    en: "The voice could not be loaded. Please check your internet connection and try again.",
+    fr: "La voix n'a pas pu être chargée. Veuillez vérifier la connexion Internet et réessayer.",
+    pl: "Nie udało się wczytać głosu. Sprawdź połączenie z internetem i spróbuj ponownie.",
+    es: "No se pudo cargar la voz. Comprueba la conexión a Internet e inténtalo de nuevo.",
+  },
+  helpSrc6Label: {
+    de: "Sprachausgabe (falls der Browser keine eigene Stimme hat)", en: "Text-to-speech (if the browser has no built-in voice)",
+    fr: "Synthèse vocale (si le navigateur n'a pas de voix intégrée)", pl: "Synteza mowy (gdy przeglądarka nie ma własnego głosu)",
+    es: "Síntesis de voz (si el navegador no tiene voz integrada)",
+  },
+  helpSrc6Reason: {
+    de: "Sprachmodelle, die direkt im Browser laufen. Stimmen: thorsten, cori, gosia, davefx (gemeinfrei/CC0) und siwis (CC BY 4.0, SIWIS-Datensatz, University of Edinburgh).",
+    en: "Speech models that run directly in the browser. Voices: thorsten, cori, gosia, davefx (public domain/CC0) and siwis (CC BY 4.0, SIWIS dataset, University of Edinburgh).",
+    fr: "Modèles vocaux exécutés directement dans le navigateur. Voix : thorsten, cori, gosia, davefx (domaine public/CC0) et siwis (CC BY 4.0, corpus SIWIS, University of Edinburgh).",
+    pl: "Modele mowy działające bezpośrednio w przeglądarce. Głosy: thorsten, cori, gosia, davefx (domena publiczna/CC0) oraz siwis (CC BY 4.0, zbiór SIWIS, University of Edinburgh).",
+    es: "Modelos de voz que se ejecutan directamente en el navegador. Voces: thorsten, cori, gosia, davefx (dominio público/CC0) y siwis (CC BY 4.0, corpus SIWIS, University of Edinburgh).",
+  },
+  a11ySpeakNoVoice: {
+    de: "Für Deutsch ist in diesem Browser keine Stimme verfügbar. Abhilfe: Chrome oder Edge verwenden oder unter Windows in „Einstellungen → Zeit und Sprache → Sprache“ das deutsche Sprachpaket mit Sprachausgabe installieren.",
+    en: "No English voice is available in this browser. To fix this, use Chrome or Edge, or install the English language pack with text-to-speech in Windows under “Settings → Time & language → Language”.",
+    fr: "Aucune voix française n'est disponible dans ce navigateur. Solution : utiliser Chrome ou Edge, ou installer sous Windows le module linguistique français avec synthèse vocale dans « Paramètres → Heure et langue → Langue ».",
+    pl: "W tej przeglądarce brak polskiego głosu. Rozwiązanie: użyj Chrome lub Edge albo zainstaluj w systemie Windows polski pakiet językowy z zamianą tekstu na mowę w „Ustawienia → Czas i język → Język”.",
+    es: "No hay ninguna voz en español disponible en este navegador. Solución: usar Chrome o Edge, o instalar en Windows el paquete de idioma español con texto a voz en «Configuración → Hora e idioma → Idioma».",
+  },
   a11ySpeakUnsupported: {
     de: "Vorlesen wird von diesem Browser nicht unterstützt.", en: "Reading aloud is not supported by this browser.",
     fr: "La lecture à voix haute n'est pas prise en charge par ce navigateur.",
@@ -295,11 +399,11 @@ export const STRINGS = {
     es: "El tiempo, el nivel del agua, los incendios y la calidad del aire se actualizan automáticamente cada 5 minutos, la hora cada segundo — no es necesario recargar la página.",
   },
   helpUsage4: {
-    de: "Amtliche Warnungen werden beim Bauen der Seite geladen und können bis zu 30 Minuten alt sein; bei einem lange geöffneten Tab hilft ein Neuladen der Seite.",
-    en: "Official warnings are loaded when the page is built and can be up to 30 minutes old; if a tab has been open for a while, reloading the page helps.",
-    fr: "Les alertes officielles sont chargées lors de la génération de la page et peuvent avoir jusqu'à 30 minutes de retard ; si un onglet est ouvert depuis longtemps, il est utile de recharger la page.",
-    pl: "Oficjalne ostrzeżenia są wczytywane podczas budowania strony i mogą być nieaktualne o maksymalnie 30 minut; jeśli karta jest otwarta od dłuższego czasu, warto odświeżyć stronę.",
-    es: "Los avisos oficiales se cargan al generar la página y pueden tener hasta 30 minutos de antigüedad; si una pestaña lleva mucho tiempo abierta, conviene recargar la página.",
+    de: "Amtliche Warnungen werden nur beim automatischen Neubau der Seite geladen. Das passiert mehrmals täglich, aber nicht zu festen Zeiten – die Warnungen können daher mehrere Stunden alt sein. Ihr Alter steht in der Kachel; ab einer Stunde erscheint ein Hinweis.",
+    en: "Official warnings are only loaded when the page is automatically rebuilt. This happens several times a day, but not at fixed times, so warnings can be several hours old. Their age is shown in the tile; after one hour a notice appears.",
+    fr: "Les alertes officielles ne sont chargées que lors de la régénération automatique de la page. Cela se produit plusieurs fois par jour, mais pas à heures fixes : les alertes peuvent donc dater de plusieurs heures. Leur ancienneté est indiquée dans la tuile ; au-delà d'une heure, un avertissement s'affiche.",
+    pl: "Oficjalne ostrzeżenia są wczytywane tylko podczas automatycznej przebudowy strony. Dzieje się to kilka razy dziennie, ale nie o stałych porach, dlatego ostrzeżenia mogą mieć kilka godzin. Ich wiek widać na kafelku; po godzinie pojawia się komunikat.",
+    es: "Los avisos oficiales solo se cargan cuando la página se regenera automáticamente. Esto ocurre varias veces al día, pero no a horas fijas, por lo que los avisos pueden tener varias horas de antigüedad. Su antigüedad se muestra en el recuadro; pasada una hora aparece un aviso.",
   },
   helpUsage5: {
     de: "Auf einem Leitstellen-Monitor passt alles ohne Scrollen auf einen Bildschirm; auf Tablet/Smartphone lässt sich die Seite normal scrollen.",
@@ -314,6 +418,13 @@ export const STRINGS = {
     fr: "Le bouton d'accessibilité (icône à côté) permet de régler la langue, le mode clair/sombre, le contraste élevé et la lecture à voix haute de la situation.",
     pl: "Przycisk dostępności (ikona obok) pozwala ustawić język, jasny/ciemny motyw, wysoki kontrast i odczyt sytuacji na głos.",
     es: "El botón de accesibilidad (icono junto a este) permite ajustar el idioma, el modo claro/oscuro, el alto contraste y la lectura en voz alta de la situación.",
+  },
+  helpUsage7: {
+    de: "Alles ist auch per Tastatur bedienbar: Tab wechselt zwischen den Knöpfen, Enter öffnet Details, Esc schließt ein Fenster wieder.",
+    en: "Everything can also be operated by keyboard: Tab moves between buttons, Enter opens details, Esc closes a window again.",
+    fr: "Tout peut aussi se commander au clavier : Tab passe d'un bouton à l'autre, Entrée ouvre les détails, Échap referme une fenêtre.",
+    pl: "Wszystko można obsługiwać także klawiaturą: Tab przechodzi między przyciskami, Enter otwiera szczegóły, Esc zamyka okno.",
+    es: "Todo se puede manejar también con el teclado: Tab cambia entre botones, Intro abre los detalles y Esc vuelve a cerrar una ventana.",
   },
   helpNotesHeading: {
     de: "Zu beachten", en: "Important to know", fr: "À noter", pl: "Warto wiedzieć", es: "A tener en cuenta",
@@ -361,11 +472,11 @@ export const STRINGS = {
     es: "El tiempo y la calidad del aire aportan contexto sobre riesgos meteorológicos y posible exposición al humo.",
   },
   helpSrc2Reason: {
-    de: "Der örtliche Wasserstand mit Verlauf und Tendenz hilft, die Hochwasserlage an der Spree einzuschätzen.",
-    en: "The local water level, its history and trend help assess flood conditions on the Spree.",
-    fr: "Le niveau local, son évolution et sa tendance aident à évaluer le risque d'inondation sur la Spree.",
-    pl: "Lokalny poziom wody, jego przebieg i tendencja pomagają ocenić zagrożenie powodziowe na Sprewie.",
-    es: "El nivel local del agua, su evolución y tendencia ayudan a evaluar el riesgo de inundación en el Spree.",
+    de: "Der örtliche Wasserstand, eingeordnet an den amtlichen Kennwerten: NNW/HHW = niedrigster/höchster je gemessener Stand, MW = Mittelwasser, MHW = mittleres Hochwasser.",
+    en: "The local water level, classified against the official reference values: NNW/HHW = lowest/highest level ever recorded, MW = mean water level, MHW = mean high water.",
+    fr: "Le niveau local, situé par rapport aux valeurs de référence officielles : NNW/HHW = niveau le plus bas/le plus haut jamais mesuré, MW = niveau moyen, MHW = crue moyenne.",
+    pl: "Lokalny poziom wody na tle oficjalnych wartości charakterystycznych: NNW/HHW = najniższy/najwyższy zmierzony stan, MW = średni stan wody, MHW = średnia wielka woda.",
+    es: "El nivel local del agua, clasificado según los valores oficiales de referencia: NNW/HHW = nivel más bajo/más alto jamás medido, MW = nivel medio, MHW = crecida media.",
   },
   helpSrc3Label: {
     de: "Brände, Gesamteinsätze, Reaktionszeit", en: "Fires, total call-outs, response time",
@@ -464,9 +575,9 @@ export const WEATHER_LABELS = {
 };
 
 export const TREND_LABELS = {
-  steigend: { de: "steigend", en: "rising", fr: "en hausse", pl: "rosnący", es: "en aumento" },
-  fallend: { de: "fallend", en: "falling", fr: "en baisse", pl: "spadający", es: "en descenso" },
-  stabil: { de: "stabil", en: "stable", fr: "stable", pl: "stabilny", es: "estable" },
+  steigend: { de: "steigend", en: "rising", fr: "en hausse", pl: "rosnąca", es: "en aumento" },
+  fallend: { de: "fallend", en: "falling", fr: "en baisse", pl: "malejąca", es: "en descenso" },
+  stabil: { de: "stabil", en: "stable", fr: "stable", pl: "stabilna", es: "estable" },
 };
 
 export const AQI_LABELS = {
@@ -485,6 +596,16 @@ export const SEVERITY_LABELS = {
 
 // Sätze für die Sprachausgabe (Web Speech API). Kurz & einfach gehalten,
 // damit die Übersetzung über alle Sprachen hinweg zuverlässig bleibt.
+// Polnisch hat drei Zahlformen: 1 ostrzeżenie, 2–4 ostrzeżenia (außer 12–14),
+// sonst ostrzeżeń. Gilt für ganze Zahlen; negative Werte nach Betrag.
+function plPlural(n, one, few, many) {
+  const a = Math.abs(n);
+  if (a === 1) return one;
+  const mod10 = a % 10;
+  const mod100 = a % 100;
+  return mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? few : many;
+}
+
 export const SPEECH = {
   intro: {
     de: "Lagebericht Berlin.", en: "Situation report Berlin.", fr: "Rapport de situation Berlin.",
@@ -494,21 +615,21 @@ export const SPEECH = {
     de: (t, c) => `Temperatur ${t} Grad, ${c}.`,
     en: (t, c) => `Temperature ${t} degrees, ${c}.`,
     fr: (t, c) => `Température ${t} degrés, ${c}.`,
-    pl: (t, c) => `Temperatura ${t} stopni, ${c}.`,
+    pl: (t, c) => `Temperatura ${t} ${plPlural(t, "stopień", "stopnie", "stopni")}, ${c}.`,
     es: (t, c) => `Temperatura ${t} grados, ${c}.`,
   },
   pegel: {
     de: (v, tr) => `Pegel Spree Köpenick: ${v} Zentimeter, Tendenz ${tr}.`,
     en: (v, tr) => `Spree water level at Köpenick: ${v} centimeters, trend ${tr}.`,
     fr: (v, tr) => `Niveau de la Spree à Köpenick : ${v} centimètres, tendance ${tr}.`,
-    pl: (v, tr) => `Poziom Spree w Köpenick: ${v} centymetrów, tendencja ${tr}.`,
+    pl: (v, tr) => `Poziom Szprewy w Köpenick: ${v} ${plPlural(v, "centymetr", "centymetry", "centymetrów")}, tendencja ${tr}.`,
     es: (v, tr) => `Nivel del Spree en Köpenick: ${v} centímetros, tendencia ${tr}.`,
   },
   fire: {
     de: (n) => `Brände gestern: ${n} Einsätze.`,
     en: (n) => `Fires yesterday: ${n} calls.`,
     fr: (n) => `Incendies hier : ${n} interventions.`,
-    pl: (n) => `Pożary wczoraj: ${n} interwencji.`,
+    pl: (n) => `Pożary wczoraj: ${n} ${plPlural(n, "interwencja", "interwencje", "interwencji")}.`,
     es: (n) => `Incendios ayer: ${n} intervenciones.`,
   },
   aqi: {
@@ -523,7 +644,7 @@ export const SPEECH = {
     de: (n, h) => `${n} aktive Warnung${n === 1 ? "" : "en"}: ${h}.`,
     en: (n, h) => `${n} active warning${n === 1 ? "" : "s"}: ${h}.`,
     fr: (n, h) => `${n} alerte${n === 1 ? "" : "s"} active${n === 1 ? "" : "s"} : ${h}.`,
-    pl: (n, h) => `${n} aktywnych ostrzeżeń: ${h}.`,
+    pl: (n, h) => `${n} ${plPlural(n, "aktywne ostrzeżenie", "aktywne ostrzeżenia", "aktywnych ostrzeżeń")}: ${h}.`,
     es: (n, h) => `${n} aviso${n === 1 ? "" : "s"} activo${n === 1 ? "" : "s"}: ${h}.`,
   },
 };
@@ -660,4 +781,5 @@ export function applyStaticTranslations() {
     const key = el.getAttribute("data-i18n-title");
     el.setAttribute("title", t(key));
   });
+  document.title = t("documentTitle");
 }

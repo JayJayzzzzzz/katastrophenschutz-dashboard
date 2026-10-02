@@ -31,8 +31,13 @@ const WEATHER_ICON_BY_CODE = {
   95: "thunder", 96: "thunder", 99: "thunder",
 };
 
-function iconFor(code) {
-  return WEATHER_ICON_BY_CODE[code] || "cloud";
+// Nachts (is_day = 0 bei Open-Meteo) Mond statt Sonne. Nur für das aktuelle
+// Wetter relevant; die 7-Tage-Vorhersage zeigt Tageswerte.
+const NIGHT_ICON = { sun: "moon", "cloud-sun": "cloud-moon" };
+
+function iconFor(code, isDay = true) {
+  const icon = WEATHER_ICON_BY_CODE[code] || "cloud";
+  return isDay ? icon : NIGHT_ICON[icon] || icon;
 }
 function $(id) {
   return document.getElementById(id);
@@ -94,8 +99,30 @@ function chartLabelFontSize() {
   return 10.5;
 }
 
+// Neu gezeichnet wird, sobald sich die Größe des Charts selbst ändert — nicht
+// nur bei einem Fenster-Resize. Sonst bleibt eine Zeichnung mit veralteter
+// viewBox stehen, wenn eine Kachel erst nach dem Laden der Daten ihre
+// endgültige Größe bekommt, und Linien und Beschriftungen werden gestaucht.
+const pendingChartRedraws = new Set();
+const redrawPendingCharts = debounce(() => {
+  pendingChartRedraws.forEach((svg) => Object.values(charts).find((c) => c.svg === svg)?.draw());
+  pendingChartRedraws.clear();
+}, 100);
+const chartResizeObserver =
+  "ResizeObserver" in window
+    ? new ResizeObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.contentRect.width && entry.contentRect.height) pendingChartRedraws.add(entry.target);
+        });
+        redrawPendingCharts();
+      })
+    : null;
+
 function registerChart(name, svg, tooltip, drawFn) {
+  const previous = charts[name];
+  if (previous?.svg && previous.svg !== svg) chartResizeObserver?.unobserve(previous.svg);
   charts[name] = { svg, tooltip, draw: drawFn };
+  if (svg && previous?.svg !== svg) chartResizeObserver?.observe(svg);
 }
 
 function redrawAllCharts() {
@@ -309,7 +336,7 @@ async function loadWeather() {
   try {
     const url =
       `${WEATHER_URL}?latitude=${BERLIN_LAT}&longitude=${BERLIN_LON}` +
-      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation,weather_code,uv_index` +
+      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation,weather_code,uv_index,is_day` +
       `&hourly=temperature_2m,weather_code` +
       `&daily=temperature_2m_min,temperature_2m_max,weather_code,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max` +
       `&timezone=Europe%2FBerlin&forecast_days=7`;
@@ -337,7 +364,7 @@ function renderWeather() {
   setText("tempMax", Math.round(data.daily.temperature_2m_max[0]) + "°");
 
   const heroIcon = $("heroIcon");
-  if (heroIcon) heroIcon.innerHTML = `<use href="#i-${iconFor(code)}"/>`;
+  if (heroIcon) heroIcon.innerHTML = `<use href="#i-${iconFor(code, current.is_day !== 0)}"/>`;
 
   // Open-Meteo liefert Windwerte standardmäßig bereits in km/h (kein m/s) —
   // hier NICHT zusätzlich mit 3.6 umrechnen.
@@ -660,14 +687,53 @@ function renderFire() {
 
 // ---------- Pegelstand Spree · Berlin-Köpenick (PEGELONLINE / WSV) ----------
 
+// Die Spree in Köpenick ist durch Wehre und Schleusen reguliert und schwankt
+// meist nur um 1–3 cm. Ein Zeitverlauf zeigt dann fast nur Messrauschen —
+// für die Lage zählt die Einordnung. Deshalb zeigt die Kachel eine Pegellatte
+// mit den amtlichen Kennwerten der Messstelle und daneben einen stilisierten
+// Flussquerschnitt, der bis zum aktuellen Stand gefüllt ist.
+
+// Amtliche Kennwerte (PEGELONLINE, Mittelwerte 2010–2020). Werden beim Laden
+// live abgefragt; diese Werte dienen nur als Rückfall.
+const PEGEL_KENNWERTE_FALLBACK = { NNW: 53, MNW: 83, MW: 87, MHW: 96, HHW: 165 };
+let pegelKennwerte = { ...PEGEL_KENNWERTE_FALLBACK };
 let lastPegelSeries = null;
+
+// Eigene Bereichsgrenzen aus den Kennwerten — PEGELONLINE liefert für
+// Köpenick keine Hochwasser-Meldestufen: niedrig unter MNW, normal bis MHW,
+// erhöht bis zur Mitte zwischen MHW und HHW, hoch darüber, Rekordnähe ab
+// 10 cm unter dem höchsten je gemessenen Stand.
+function pegelZones(kw) {
+  const high = Math.round(kw.MHW + (kw.HHW - kw.MHW) / 2);
+  const record = kw.HHW - 10;
+  return [
+    { key: "low", from: -Infinity, to: kw.MNW },
+    { key: "normal", from: kw.MNW, to: kw.MHW },
+    { key: "raised", from: kw.MHW, to: high },
+    { key: "high", from: high, to: record },
+    { key: "record", from: record, to: Infinity },
+  ];
+}
 
 async function loadPegel() {
   try {
-    const res = await fetch(`${PEGEL_BASE}/W/measurements.json?start=P2D`);
+    const [res, stationRes] = await Promise.all([
+      fetch(`${PEGEL_BASE}/W/measurements.json?start=P2D`),
+      fetch(`${PEGEL_BASE}.json?includeTimeseries=true&includeCharacteristicValues=true`).catch(() => null),
+    ]);
     if (!res.ok) throw new Error("Pegeldaten nicht erreichbar");
     const series = await res.json();
     if (!series.length) throw new Error("Keine Pegeldaten");
+    try {
+      const station = stationRes?.ok ? await stationRes.json() : null;
+      const values = station?.timeseries?.find((ts) => ts.shortname === "W")?.characteristicValues || [];
+      const kw = Object.fromEntries(values.map((c) => [c.shortname, c.value]));
+      if (Object.keys(PEGEL_KENNWERTE_FALLBACK).every((k) => Number.isFinite(kw[k]))) {
+        pegelKennwerte = Object.fromEntries(Object.keys(PEGEL_KENNWERTE_FALLBACK).map((k) => [k, kw[k]]));
+      }
+    } catch {
+      // Kennwerte nicht lesbar: Rückfallwerte behalten.
+    }
     lastPegelSeries = series;
     renderPegel();
   } catch (error) {
@@ -682,37 +748,114 @@ function renderPegel() {
   if (!series || !series.length) return;
 
   const latest = series[series.length - 1];
-  setText("pegelValue", Math.round(latest.value) + " cm");
+  const current = Math.round(latest.value);
+  setText("pegelValue", current + " cm");
   setText("pegelTime", t("standPrefix") + " " + formatClock(latest.timestamp));
 
-  // Tendenz aus den letzten ~3h (12 Messpunkte à 15 Min.) ableiten.
-  const recentWindow = series.slice(-12);
-  const diff = latest.value - recentWindow[0].value;
-  const trendKey = diff >= 1 ? "steigend" : diff <= -1 ? "fallend" : "stabil";
-  setText("pegelTrend", t("trendPrefix") + " " + trendLabel(trendKey));
+  const zone = pegelZones(pegelKennwerte).find((z) => current >= z.from && current < z.to);
+  const zoneEl = $("pegelZone");
+  if (zoneEl) {
+    zoneEl.hidden = false;
+    zoneEl.className = "pegel-zone is-" + zone.key;
+    zoneEl.textContent = t("pegelZone_" + zone.key);
+  }
 
-  speechState.pegel = Math.round(latest.value);
+  // Tendenz über 24 Stunden: Messwert von vor 24 h mit dem aktuellen
+  // vergleichen. Unter 2 cm gilt als stabil (Messauflösung 1 cm).
+  const dayAgo = new Date(latest.timestamp).getTime() - 24 * 3600 * 1000;
+  const ref = series.find((p) => new Date(p.timestamp).getTime() >= dayAgo) || series[0];
+  const diff = Math.round(latest.value - ref.value);
+  const trendKey = diff >= 2 ? "steigend" : diff <= -2 ? "fallend" : "stabil";
+  const diffText = diff === 0 ? "±0" : (diff > 0 ? "+" : "−") + Math.abs(diff);
+  setText("pegelTrend", `${t("trendPrefix")} ${trendLabel(trendKey)} · ${diffText} cm / 24 h`);
+
+  speechState.pegel = current;
   speechState.trend = trendLabel(trendKey);
 
-  registerChart("pegel", $("pegelChart"), $("pegelTooltip"), () =>
-    drawLineChart(
-      $("pegelChart"),
-      $("pegelTooltip"),
-      series.map((p) => p.value),
-      series.map((p) => p.timestamp),
-      {
-        id: "pegel",
-        color: "var(--series-pegel)",
-        grid: false,
-        padding: { top: 8, right: 4, bottom: 16, left: 4 },
-        xLabelCount: 3,
-        valueFormatter: (v) => Math.round(v) + " cm",
-        labelFormatter: (time) => new Date(time).toLocaleDateString(locale(), { day: "2-digit", month: "2-digit" }) + " " + formatClock(time),
-        xLabelFormatter: (time) => new Date(time).toLocaleDateString(locale(), { day: "2-digit", month: "2-digit" }),
-      }
-    )
-  );
+  registerChart("pegel", $("pegelChart"), null, () => drawPegelGauge($("pegelChart"), current));
   charts.pegel.draw();
+}
+
+// Pegellatte links (Skala, farbige Bereiche, Wassersäule bis zum aktuellen
+// Stand), rechts stilisierter Flussquerschnitt mit Kennwert-Linien.
+function drawPegelGauge(svg, current) {
+  if (!svg) return;
+  const w = svg.clientWidth;
+  const h = svg.clientHeight;
+  if (!w || !h) return;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.removeAttribute("preserveAspectRatio");
+
+  const kw = pegelKennwerte;
+  const fs = chartLabelFontSize();
+  const lo = Math.min(kw.NNW - 8, current - 5);
+  const hi = Math.max(kw.HHW + 7, current + 5);
+  const top = 4;
+  const bottom = h - 4;
+  const y = (v) => bottom - ((v - lo) / (hi - lo)) * (bottom - top);
+
+  // Pegellatte
+  const x0 = Math.round(fs * 2.9);
+  const barW = Math.round(Math.max(14, Math.min(fs * 2.2, w * 0.09)));
+  let out = "";
+  for (const z of pegelZones(kw)) {
+    const a = Math.max(z.from, lo);
+    const b = Math.min(z.to, hi);
+    if (b <= a) continue;
+    out += `<rect class="pegel-zone-fill is-${z.key}" x="${x0}" y="${y(b)}" width="${barW}" height="${y(a) - y(b)}"></rect>`;
+  }
+  const inset = Math.round(barW * 0.27);
+  out += `<rect x="${x0 + inset}" y="${y(current)}" width="${barW - 2 * inset}" height="${bottom - y(current)}" rx="2" fill="var(--series-pegel)"></rect>`;
+  out += `<rect x="${x0}" y="${top}" width="${barW}" height="${bottom - top}" rx="4" fill="none" stroke="var(--chart-grid)"></rect>`;
+  // Skala: Teilstriche alle 10 cm, Zahlen alle 20 cm (bei wenig Höhe alle 40)
+  const labelStep = (bottom - top) / (hi - lo) * 20 < fs * 1.6 ? 40 : 20;
+  for (let v = Math.ceil(lo / 10) * 10; v <= hi; v += 10) {
+    const major = v % labelStep === 0;
+    out += `<line x1="${x0 - (major ? 6 : 3)}" x2="${x0}" y1="${y(v)}" y2="${y(v)}" stroke="var(--muted)" stroke-opacity="0.6"></line>`;
+    if (major && Math.abs(y(v) - y(current)) > fs) {
+      out += `<text x="${x0 - 9}" y="${y(v) + fs * 0.35}" text-anchor="end" fill="var(--muted)" font-size="${fs}">${v}</text>`;
+    }
+  }
+  const cy = y(current);
+  out += `<path d="M${x0 - 1},${cy} l-8,-5 v10 z" fill="var(--text)"></path>`;
+  out += `<line x1="${x0}" x2="${x0 + barW}" y1="${cy}" y2="${cy}" stroke="var(--text)" stroke-width="2"></line>`;
+
+  // Flussquerschnitt
+  const sx = x0 + barW + 10;
+  const sR = w - 2;
+  const W = sR - sx;
+  const bank = (f) => sx + f * W;
+  const bankTop = Math.min(hi, kw.HHW - 15);
+  const bedBottom = Math.max(lo + 2, kw.NNW - 4);
+  const bed =
+    `M${sx},${y(bankTop)} C${bank(0.12)},${y(bankTop)} ${bank(0.2)},${y(bedBottom + 3)} ${bank(0.36)},${y(bedBottom)} ` +
+    `L${bank(0.66)},${y(bedBottom)} C${bank(0.82)},${y(bedBottom + 3)} ${bank(0.88)},${y(bankTop)} ${sR},${y(bankTop)}`;
+  const wy = y(current);
+  let wave = `M${sx},${wy}`;
+  for (let i = 1; i <= 12; i++) wave += ` L${sx + (i / 12) * W},${wy + Math.sin(i * 1.4) * 1.2}`;
+  out += `<defs><clipPath id="pegelBedClip"><path d="${bed} L${sR},${y(bankTop)} L${sx},${y(bankTop)} Z"></path></clipPath></defs>`;
+  out += `<path class="pegel-ground" d="${bed} L${sR},${bottom} L${sx},${bottom} Z"></path>`;
+  out += `<path d="${wave} L${sR},${bottom} L${sx},${bottom} Z" fill="var(--series-pegel)" fill-opacity="0.55" clip-path="url(#pegelBedClip)"></path>`;
+  out += `<path d="${bed}" fill="none" stroke="var(--muted)" stroke-opacity="0.7" stroke-width="1.5"></path>`;
+
+  // Kennwert-Linien über die ganze Breite; Beschriftungen, die zu dicht
+  // liegen, werden auseinandergeschoben (bei sehr wenig Höhe ohne NNW).
+  const marks = [["HHW", kw.HHW], ["MHW", kw.MHW], ["MW", kw.MW]];
+  if (bottom - top > fs * 9) marks.push(["NNW", kw.NNW]);
+  const gap = fs + 2;
+  const labels = marks.map(([k, v]) => ({ k, v, pos: y(v) - 3 })).sort((a, b) => a.pos - b.pos);
+  for (let i = 1; i < labels.length; i++) labels[i].pos = Math.max(labels[i].pos, labels[i - 1].pos + gap);
+  const overflow = labels.at(-1).pos - (bottom - 2);
+  if (overflow > 0) labels.forEach((l) => (l.pos -= overflow));
+  for (const { k, v, pos } of labels) {
+    const isMW = k === "MW";
+    out += `<line x1="${sx}" x2="${sR}" y1="${y(v)}" y2="${y(v)}" stroke="${isMW ? "var(--text)" : "var(--muted)"}" stroke-dasharray="4 3" stroke-opacity="0.6"></line>`;
+    out += `<text x="${sR - 2}" y="${Math.max(top + fs, pos)}" text-anchor="end" font-size="${fs}" fill="var(--muted)" stroke="var(--panel)" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan font-weight="800" fill="${isMW ? "var(--text)" : "var(--muted)"}">${k}</tspan> ${v}</text>`;
+  }
+  const labelY = Math.min(wy + fs + 5, y(bedBottom) - 3);
+  out += `<text x="${bank(0.5)}" y="${labelY}" text-anchor="middle" font-size="${fs + 1.5}" font-weight="800" fill="var(--text)">${current} cm</text>`;
+
+  svg.innerHTML = out;
 }
 
 // ---------- Luftqualität (Open-Meteo Air Quality) ----------
@@ -765,12 +908,30 @@ function renderAqi() {
 
 // ---------- Warnungen ----------
 // Die Warnungen selbst kommen bereits mehrsprachig (de/en/fr/pl/es) vom Bund
-// und wurden beim Bauen der Seite serverseitig geladen (siehe index.astro,
-// die dortige API hat kein CORS). Sie stehen als JSON im Dokument und werden
-// hier komplett client-seitig gerendert — genau wie die Tages-Vorhersage,
-// damit ein Sprachwechsel ohne neuen Netzwerk-Request funktioniert.
+// und wurden zur Build-Zeit in Node.js geladen (siehe index.astro — die
+// NINA-API erlaubt keinen Cross-Origin-Zugriff aus dem Browser). Sie stehen
+// als JSON im Dokument und werden hier komplett client-seitig gerendert —
+// genau wie die Tages-Vorhersage, damit ein Sprachwechsel ohne neuen
+// Netzwerk-Request funktioniert.
+//
+// Sie sind deshalb nur so aktuell wie der letzte Seiten-Build. GitHub führt
+// geplante Builds nicht garantiert pünktlich aus (gemessen: 3–7 Std. Abstand),
+// also zeigen wir das Alter an und weisen ab WARN_STALE_MINUTES darauf hin.
+const WARN_STALE_MINUTES = 60;
 
 let warningsPayload = { warnings: [], warningsError: false, buildStamp: null };
+
+function warningsAgeMinutes() {
+  const stamp = warningsPayload.buildStamp;
+  return stamp ? Math.max(0, (Date.now() - new Date(stamp).getTime()) / 60000) : null;
+}
+
+function formatWarningsAge(minutes) {
+  const rtf = new Intl.RelativeTimeFormat(locale(), { numeric: "auto", style: "short" });
+  if (minutes < 60) return rtf.format(-Math.round(minutes), "minute");
+  if (minutes < 48 * 60) return rtf.format(-Math.round(minutes / 60), "hour");
+  return rtf.format(-Math.round(minutes / 1440), "day");
+}
 
 function loadWarningsData() {
   const el = $("warnings-data");
@@ -812,7 +973,12 @@ function renderWarningsTile() {
     const buildTime = warningsPayload.buildStamp
       ? new Date(warningsPayload.buildStamp).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })
       : null;
-    const updatedMarkup = buildTime ? `<p class="warn-updated">${t("warnUpdated")}: ${buildTime}</p>` : "";
+    const age = warningsAgeMinutes();
+    const stale = age !== null && age > WARN_STALE_MINUTES;
+    const updatedMarkup = buildTime
+      ? `<p class="warn-updated${stale ? " is-stale" : ""}">${t("warnUpdated")}: ${buildTime} · ${formatWarningsAge(age)}` +
+        `${stale ? `<br />${t("warnStaleTile")}` : ""}</p>`
+      : "";
 
     if (warningsError) {
       preview.innerHTML = `<p>${t("warnPreviewError")}</p>${updatedMarkup}`;
@@ -837,8 +1003,15 @@ function severityToAqiKey(severity) {
   return "good";
 }
 
+// Auf Desktop scrollt nichts, auch kein Fenster. Mehrere Warnungen passen
+// dort nicht untereinander, abschneiden kommt bei amtlichen Warnungen aber
+// nicht in Frage — daher einzeln zum Blättern (schwerste zuerst). Mobil
+// bleibt es eine scrollbare Liste.
+let warnPage = 0;
+const desktopLayout = window.matchMedia("(min-width: 1101px)");
+
 function renderWarningsModal() {
-  const { warnings, warningsError, buildStamp } = warningsPayload;
+  const { warnings, warningsError } = warningsPayload;
   const title = $("warnModalTitle");
   if (title) title.textContent = t("warnModalTitle");
 
@@ -850,7 +1023,17 @@ function renderWarningsModal() {
   } else if (warnings.length === 0) {
     body.innerHTML = `<p class="warn-empty">${t("warnPreviewEmpty")}</p>`;
   } else {
-    body.innerHTML = `<div class="warn-list">${warnings
+    const paged = desktopLayout.matches && warnings.length > 1;
+    warnPage = Math.min(warnPage, warnings.length - 1);
+    const shown = paged ? [warnings[warnPage]] : warnings;
+    const pager = paged
+      ? `<div class="warn-pager">
+          <button type="button" class="warn-pager-btn" data-warn-step="-1" aria-label="${t("warnPrev")}" ${warnPage === 0 ? "disabled" : ""}>‹</button>
+          <span aria-live="polite">${t("warnPageOf").replace("{i}", warnPage + 1).replace("{n}", warnings.length)}</span>
+          <button type="button" class="warn-pager-btn" data-warn-step="1" aria-label="${t("warnNext")}" ${warnPage === warnings.length - 1 ? "disabled" : ""}>›</button>
+        </div>`
+      : "";
+    body.innerHTML = `${pager}<div class="warn-list">${shown
       .map((w) => {
         const info = warningLang(w);
         const cls = "aqi-" + severityToAqiKey(w.severity);
@@ -869,25 +1052,49 @@ function renderWarningsModal() {
       .join("")}</div>`;
   }
 
-  const footnote = $("warnFootnote");
-  if (footnote) {
-    const stamp = buildStamp
-      ? new Date(buildStamp).toLocaleString(locale(), { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
-      : "–";
-    footnote.innerHTML = `${t("warnSource")} · ${t("buildStandLabel")}: ${stamp}`;
-  }
+  renderWarningsFootnote();
 
   speechState.warnCount = warningsError ? 0 : warnings.length;
   speechState.warnHeadline = warnings.length > 0 ? warningLang(warnings[0]).headline : "";
 }
 
+// Getrennt vom Rest des Modals, damit die Altersangabe jede Minute
+// aktualisiert werden kann, ohne die Warnungsliste (und ihre Scrollposition)
+// neu aufzubauen.
+function renderWarningsFootnote() {
+  const footnote = $("warnFootnote");
+  if (!footnote) return;
+  const { buildStamp } = warningsPayload;
+  const stamp = buildStamp
+    ? new Date(buildStamp).toLocaleString(locale(), { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "–";
+  const age = warningsAgeMinutes();
+  const ageText = age !== null ? ` (${formatWarningsAge(age)})` : "";
+  const staleText = age !== null && age > WARN_STALE_MINUTES ? `<span class="warn-stale-note">${t("warnStaleModal")}</span>` : "";
+  footnote.innerHTML = `${t("warnSource")} · ${t("buildStandLabel")}: ${stamp}${ageText}${staleText}`;
+}
+
 function openWarnings() {
   const modal = $("warnModal");
   if (!modal) return;
+  warnPage = 0;
+  renderWarningsModal();
   modal.hidden = false;
   document.body.classList.add("modal-open");
   $("warnModalClose")?.focus();
 }
+
+$("warnModalBody")?.addEventListener("click", (e) => {
+  const btn = e.target.closest?.("[data-warn-step]");
+  if (!btn) return;
+  warnPage += Number(btn.dataset.warnStep);
+  renderWarningsModal();
+  // Fokus auf dem gleichen Knopf halten (falls er jetzt deaktiviert ist, auf
+  // dem anderen), damit man per Tastatur weiterblättern kann.
+  const same = document.querySelector(`[data-warn-step="${btn.dataset.warnStep}"]`);
+  (same && !same.disabled ? same : document.querySelector("[data-warn-step]:not(:disabled)"))?.focus();
+});
+desktopLayout.addEventListener?.("change", () => renderWarningsModal());
 
 function closeWarnings() {
   const modal = $("warnModal");
@@ -930,6 +1137,45 @@ function renderDynamicTexts() {
 }
 
 // Simples Öffnen/Schließen-Panel ohne dynamischen Inhalt (Backdrop-Klick,
+// ---------- Tastaturbedienung der Fenster ----------
+// Gilt zentral für alle Fenster (.day-modal): Tab bleibt innerhalb des offenen
+// Fensters, und nach dem Schließen kehrt der Fokus zu dem Element zurück, mit
+// dem das Fenster geöffnet wurde.
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let lastFocusOutsideModal = null;
+
+function openModalElement() {
+  return document.querySelector(".day-modal:not([hidden])");
+}
+
+document.addEventListener("focusin", (e) => {
+  if (!e.target.closest?.(".day-modal")) lastFocusOutsideModal = e.target;
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const modal = openModalElement();
+  if (!modal) return;
+  const focusable = [...modal.querySelectorAll(FOCUSABLE)].filter((el) => el.getClientRects().length);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+    e.preventDefault();
+    first.focus();
+  }
+});
+
+new MutationObserver((mutations) => {
+  const closed = mutations.some((m) => m.target.classList?.contains("day-modal") && m.target.hidden);
+  const focusLost = document.activeElement === document.body || document.activeElement?.closest(".day-modal[hidden]");
+  if (closed && focusLost && !openModalElement() && lastFocusOutsideModal?.isConnected) lastFocusOutsideModal.focus();
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+
 // Schließen-Knopf, Escape) — von Hilfe- und Barrierefreiheit-Panel geteilt.
 function setupSimplePanel(openId, panelId, backdropId, closeId) {
   const openBtn = $(openId);
@@ -985,9 +1231,11 @@ function setupA11yPanel() {
 
   document.querySelectorAll(".lang-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (tts.active) stopSpeaking();
       setLang(btn.dataset.lang);
       document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("is-active", b === btn));
       renderDynamicTexts();
+      updateSpeechAvailability();
     });
   });
   document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.lang === getLang()));
@@ -1007,11 +1255,49 @@ function setupA11yPanel() {
   setupSpeech();
 }
 
-// ---------- Text-to-Speech (Web Speech API) ----------
+// ---------- Sprachausgabe ----------
+// Zwei Wege, in dieser Reihenfolge:
+//
+// 1. Stimmen des Browsers (Web Speech API). Welche es gibt, hängt von Browser
+//    und Betriebssystem ab: Windows bringt oft nur Stimmen für die
+//    Systemsprache und Englisch mit, Chrome ergänzt Online-Stimmen („Google
+//    français“ …), Edge natürliche Online-Stimmen („Microsoft … Online
+//    (Natural)“). Nur `utterance.lang` zu setzen reicht nicht — ohne
+//    Zuordnung liest der Browser mit seiner Standardstimme (meist Englisch)
+//    vor. Deshalb wählen wir die Stimme selbst.
+// 2. Fehlt eine passende Browser-Stimme (z. B. Firefox ohne installiertes
+//    Sprachpaket), kann ein Sprachmodell (Piper TTS) direkt im Browser
+//    laufen. Geladen wird es nie automatisch, sondern erst, wenn man im
+//    Barrierefreiheit-Panel auf „Stimme herunterladen“ klickt (Stimme
+//    ≈ 60 MB von Hugging Face, beim ersten Mal zusätzlich Laufzeit und
+//    Aussprache-Daten ≈ 10 MB komprimiert von cdnjs/jsDelivr). Danach
+//    bleibt die Stimme im Browser gespeichert. Der normale Seitenaufruf lädt
+//    davon nichts.
 
-let currentUtterance = null;
+const PIPER_VOICES = {
+  de: "de_DE-thorsten-medium", // CC0
+  en: "en_GB-cori-medium", // gemeinfrei
+  fr: "fr_FR-siwis-medium", // CC BY 4.0, Namensnennung in den Quellen
+  pl: "pl_PL-gosia-medium", // CC0
+  es: "es_ES-davefx-medium", // CC0
+};
+// Download beim ersten Mal: Stimme ≈ 60 MB, beim allerersten Mal zusätzlich
+// Laufzeit und Aussprache-Daten ≈ 10 MB (gemessen: 71 MB insgesamt).
+const PIPER_VOICE_MB = 60;
+const PIPER_FIRST_MB = 70;
 
-function buildSpeechText() {
+const tts = {
+  active: false,
+  run: 0, // erhöht sich bei jedem Start/Stopp; alte Läufe brechen dann ab
+  audio: null,
+  piperModule: null,
+  sessions: new Map(),
+  storedVoices: null, // Set der im Browser gespeicherten Piper-Stimmen
+  downloading: null, // voiceId des laufenden Downloads
+  progress: null,
+};
+
+function buildSpeechParts() {
   const parts = [speech("intro")];
   if (speechState.temp != null) parts.push(speech("temp", speechState.temp, speechState.cond || ""));
   if (speechState.pegel != null) parts.push(speech("pegel", speechState.pegel, speechState.trend || ""));
@@ -1019,42 +1305,415 @@ function buildSpeechText() {
   if (speechState.aqi) parts.push(speech("aqi", speechState.aqi));
   if (speechState.warnCount === 0) parts.push(speech("warnNone"));
   else if (speechState.warnCount > 0) parts.push(speech("warnSome", speechState.warnCount, speechState.warnHeadline));
-  return parts.filter(Boolean).join(" ");
+  return parts.filter(Boolean);
+}
+
+function hasWebSpeech() {
+  return "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+}
+
+function canRunPiper() {
+  return typeof WebAssembly === "object" && !!navigator.storage?.getDirectory;
+}
+
+function normalizeVoiceLang(lang) {
+  return (lang || "").toLowerCase().replace("_", "-");
+}
+
+// Beste Browser-Stimme für die aktuelle Sprache: gleiche Sprache Pflicht,
+// danach natürlich klingende Stimmen vor den klassischen Systemstimmen und
+// die exakte Region (fr-FR statt fr-CA) vor anderen Varianten.
+function pickVoice() {
+  if (!hasWebSpeech()) return null;
+  const voices = window.speechSynthesis.getVoices();
+  const wanted = normalizeVoiceLang(locale());
+  const base = wanted.split("-")[0];
+  const score = (v) => {
+    const lang = normalizeVoiceLang(v.lang);
+    let s = 0;
+    if (lang === wanted) s += 4;
+    if (/natural|neural/i.test(v.name)) s += 8;
+    else if (/online|google|premium|enhanced/i.test(v.name)) s += 6;
+    return s;
+  };
+  return voices
+    .filter((v) => normalizeVoiceLang(v.lang).split("-")[0] === base)
+    .sort((a, b) => score(b) - score(a))[0] || null;
+}
+
+// Manche Browser melden ihre Stimmen erst kurz nach dem Laden (voiceschanged).
+function waitForVoices(timeout = 1000) {
+  if (!hasWebSpeech() || window.speechSynthesis.getVoices().length) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, timeout);
+    window.speechSynthesis.addEventListener?.(
+      "voiceschanged",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+function loadPiper() {
+  tts.piperModule ??= import("@mintplex-labs/piper-tts-web").catch((error) => {
+    tts.piperModule = null;
+    throw error;
+  });
+  return tts.piperModule;
+}
+
+// Eigene Sitzung pro Stimme: Das Paket hält sonst nur eine globale Sitzung
+// und würde nach einem Sprachwechsel das zuvor geladene Modell weiterverwenden.
+function getPiperSession(voiceId) {
+  if (!tts.sessions.has(voiceId)) {
+    const session = loadPiper()
+      .then(({ TtsSession }) => {
+        TtsSession._instance = null;
+        return TtsSession.create({ voiceId, progress: (p) => tts.progress?.(p) });
+      })
+      .catch((error) => {
+        tts.sessions.delete(voiceId);
+        throw error;
+      });
+    tts.sessions.set(voiceId, session);
+  }
+  return tts.sessions.get(voiceId);
+}
+
+function showSpeakHint(text) {
+  const hint = $("speakHint");
+  if (!hint) return;
+  hint.hidden = !text;
+  hint.textContent = text || "";
+}
+
+async function getStoredVoices() {
+  if (!tts.storedVoices) {
+    try {
+      tts.storedVoices = new Set(await (await loadPiper()).stored());
+    } catch {
+      tts.storedVoices = new Set();
+    }
+  }
+  return tts.storedVoices;
+}
+
+// Zustand von Vorlesen- und Download-Knopf für die aktuelle Sprache:
+// Browser-Stimme vorhanden → vorlesen; sonst lokale Stimme gespeichert →
+// vorlesen; sonst Download-Knopf mit Hinweis anbieten (Vorlesen gesperrt).
+let availabilityCheck = 0;
+async function updateSpeechAvailability() {
+  const btn = $("speakBtn");
+  const downloadBtn = $("speakDownloadBtn");
+  if (!btn) return;
+  const check = ++availabilityCheck;
+  await waitForVoices(1500);
+  if (check !== availabilityCheck) return;
+
+  if (pickVoice()) {
+    btn.disabled = false;
+    if (downloadBtn) downloadBtn.hidden = true;
+    showSpeakHint("");
+    return;
+  }
+  if (!canRunPiper()) {
+    btn.disabled = true;
+    if (downloadBtn) downloadBtn.hidden = true;
+    showSpeakHint(hasWebSpeech() ? t("a11ySpeakNoVoice") : t("a11ySpeakUnsupported"));
+    return;
+  }
+
+  const voiceId = PIPER_VOICES[getLang()];
+  const stored = await getStoredVoices();
+  if (check !== availabilityCheck) return;
+  if (stored.has(voiceId)) {
+    btn.disabled = false;
+    if (downloadBtn) downloadBtn.hidden = true;
+    showSpeakHint("");
+    return;
+  }
+  btn.disabled = true;
+  showSpeakHint(t("a11ySpeakDownload"));
+  if (downloadBtn) {
+    downloadBtn.hidden = false;
+    if (tts.downloading === voiceId) return;
+    downloadBtn.disabled = !!tts.downloading; // es läuft schon ein Download für eine andere Sprache
+    setDownloadButtonState("idle", 0, stored.size ? PIPER_VOICE_MB : PIPER_FIRST_MB);
+  }
+}
+
+// Lädt Stimme, KI-Laufzeit und Aussprache-Daten vollständig herunter. Erst
+// danach wird das Vorlesen freigegeben, damit beim Vorlesen nichts mehr
+// nachgeladen werden muss.
+async function downloadPiperVoice() {
+  const voiceId = PIPER_VOICES[getLang()];
+  if (tts.downloading) return;
+  tts.downloading = voiceId;
+  const loaded = new Map();
+  const reportProgress = () => {
+    let done = 0, total = 0;
+    for (const [l, t] of loaded.values()) {
+      done += Math.min(l, t);
+      total += t;
+    }
+    // Höchstens 99 %, bis wirklich alles geladen ist — 100 % zeigt dann der
+    // freigegebene Vorlesen-Knopf.
+    if (total && PIPER_VOICES[getLang()] === voiceId) setDownloadButtonState("loading", Math.min(done / total, 0.99));
+  };
+  // Erwartete Größen als Startwert, bis der Server die echten meldet.
+  loaded.set("model", [0, 63e6]);
+  setDownloadButtonState("loading", 0);
+  try {
+    const { TtsSession, HF_BASE, PATH_MAP } = await loadPiper();
+    const { piperData, piperWasm } = TtsSession.WASM_LOCATIONS;
+    const modelUrl = `${HF_BASE}/${PATH_MAP[voiceId]}`;
+    const prefetch = [piperData, piperWasm].map((url, i) =>
+      withRetries(() =>
+        fetchWithProgress(url, (l, t) => {
+          loaded.set("extra" + i, [l, t || (i === 0 ? 18e6 : 0.6e6)]);
+          reportProgress();
+        })
+      )
+    );
+    // Stimme abschnittsweise laden und dort ablegen, wo das Piper-Paket sie
+    // sucht (Browser-Speicher, Ordner „piper“). Die Konfiguration zuerst: eine
+    // vorhandene .onnx-Datei bedeutet für stored(), dass die Stimme komplett ist.
+    const model = (async () => {
+      const config = await withRetries(() => fetchChunked(`${modelUrl}.json`, () => {}));
+      const onnx = await fetchChunked(modelUrl, (l, t) => {
+        loaded.set("model", [l, t]);
+        reportProgress();
+      });
+      await writePiperFile(`${voiceId}.onnx.json`, config);
+      await writePiperFile(`${voiceId}.onnx`, onnx);
+    })();
+    await Promise.all([model, ...prefetch]);
+    // Sitzung anlegen: liest die Stimme jetzt aus dem Browser-Speicher und lädt
+    // nur noch die KI-Laufzeit (≈ 2 MB).
+    await getPiperSession(voiceId);
+    (await getStoredVoices()).add(voiceId);
+  } catch (error) {
+    console.error("Stimme konnte nicht geladen werden:", error);
+    tts.downloading = null;
+    tts.progress = null;
+    const downloadBtn = $("speakDownloadBtn");
+    if (downloadBtn) downloadBtn.disabled = false;
+    setDownloadButtonState("idle", 0, tts.storedVoices?.size ? PIPER_VOICE_MB : PIPER_FIRST_MB);
+    showSpeakHint(t("a11ySpeakLoadError"));
+    return;
+  }
+  tts.downloading = null;
+  tts.progress = null;
+  updateSpeechAvailability();
+}
+
+// Lädt eine Datei in Abschnitten (HTTP-Range). Jeder Abschnitt dauert selbst
+// bei 0,4 Mbit/s unter einer Minute; schlägt einer fehl, wird nur dieser
+// wiederholt. In einem Stück brach der Download der 60-MB-Stimme bei langsamem
+// 3G nach etwa 10 Minuten ab und hätte von vorn beginnen müssen.
+const CHUNK_BYTES = 2 * 1024 * 1024;
+
+async function fetchChunked(url, onProgress) {
+  const parts = [];
+  let received = 0;
+  let total = Infinity;
+  let source = url; // nach der ersten Antwort direkt die CDN-Adresse nutzen
+  while (received < total) {
+    const end = received + CHUNK_BYTES - 1;
+    const res = await withRetries(async (attempt) => {
+      // Nach einem Fehler wieder über die Originaladresse gehen: die
+      // weitergeleitete CDN-Adresse ist nur begrenzt gültig.
+      const r = await fetch(attempt === 0 ? source : url, { headers: { Range: `bytes=${received}-${end}` } });
+      if (!r.ok) throw new Error(`HTTP ${r.status} für ${url}`);
+      return r;
+    });
+    source = res.url || url;
+    if (res.status === 200) {
+      // Server ignoriert Range: die ganze Datei kam in einem Stück.
+      const blob = await res.blob();
+      onProgress(blob.size, blob.size);
+      return blob;
+    }
+    const range = /\/(\d+)\s*$/.exec(res.headers.get("Content-Range") || "");
+    if (range) total = Number(range[1]);
+    const chunk = await res.blob();
+    if (!chunk.size) throw new Error(`Leerer Abschnitt bei Byte ${received} von ${url}`);
+    parts.push(chunk);
+    received += chunk.size;
+    // Ohne Größenangabe weiterladen, bis ein Abschnitt kürzer zurückkommt.
+    if (!range && chunk.size < CHUNK_BYTES) total = received;
+    onProgress(received, Number.isFinite(total) ? total : received);
+  }
+  return new Blob(parts);
+}
+
+async function withRetries(fn, attempts = 5) {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn(i);
+    } catch (error) {
+      if (i + 1 >= attempts) throw error;
+      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** i, 15000)));
+    }
+  }
+}
+
+async function writePiperFile(name, blob) {
+  const root = await navigator.storage.getDirectory();
+  const dir = await root.getDirectoryHandle("piper", { create: true });
+  const file = await dir.getFileHandle(name, { create: true });
+  const writable = await file.createWritable();
+  await writable.write(blob);
+  await writable.close();
+}
+
+async function fetchWithProgress(url, onProgress) {
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} für ${url}`);
+  // Bei komprimierter Auslieferung nennt Content-Length die komprimierte
+  // Größe, gezählt werden aber entpackte Bytes — dann lieber schätzen.
+  const total = res.headers.get("Content-Encoding") ? 0 : Number(res.headers.get("Content-Length")) || 0;
+  const reader = res.body.getReader();
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.length;
+    onProgress(received, total);
+  }
+}
+
+function setDownloadButtonState(state, progress = 0, mb = PIPER_VOICE_MB) {
+  const btn = $("speakDownloadBtn");
+  const label = $("speakDownloadLabel");
+  if (!btn || !label) return;
+  const loading = state === "loading";
+  btn.classList.toggle("is-loading", loading);
+  btn.setAttribute("aria-busy", loading ? "true" : "false");
+  if (loading) btn.disabled = true;
+  label.textContent = loading
+    ? `${t("a11ySpeakLoading")} ${Math.round(progress * 100)} %`
+    : t("a11ySpeakDownloadBtn").replace("{mb}", mb);
+}
+
+function stopSpeaking() {
+  tts.run++;
+  tts.active = false;
+  tts.progress = null;
+  if (hasWebSpeech()) window.speechSynthesis.cancel();
+  tts.audio?.pause();
+  setSpeakButtonState("idle");
+}
+
+function speakWithBrowser(voice, parts) {
+  // Satzweise vorlesen: Chrome bricht Online-Stimmen bei langen Texten nach
+  // etwa 15 Sekunden kommentarlos ab.
+  window.speechSynthesis.cancel();
+  setSpeakButtonState("speaking");
+  parts.forEach((part, i) => {
+    const utterance = new SpeechSynthesisUtterance(part);
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    if (i === parts.length - 1) utterance.onend = () => stopSpeaking();
+    utterance.onerror = (e) => {
+      if (e.error !== "interrupted" && e.error !== "canceled") stopSpeaking();
+    };
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+function playBlob(blob, run) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    tts.audio = audio;
+    const done = () => {
+      URL.revokeObjectURL(url);
+      if (tts.audio === audio) tts.audio = null;
+      resolve();
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    audio.onpause = () => {
+      if (run !== tts.run) done();
+    };
+    audio.play().catch(done);
+  });
+}
+
+// Nur für bereits heruntergeladene Stimmen (siehe downloadPiperVoice): Das
+// Modell kommt aus dem Browser-Speicher, es wird nichts heruntergeladen.
+async function speakWithPiper(parts, run) {
+  setSpeakButtonState("preparing");
+  const session = await getPiperSession(PIPER_VOICES[getLang()]);
+  if (run !== tts.run) return;
+  setSpeakButtonState("speaking");
+  // Den nächsten Satz berechnen, während der aktuelle abgespielt wird.
+  let next = session.predict(parts[0]);
+  for (let i = 0; i < parts.length; i++) {
+    const blob = await next;
+    if (run !== tts.run) return;
+    next = i + 1 < parts.length ? session.predict(parts[i + 1]) : null;
+    await playBlob(blob, run);
+    if (run !== tts.run) return;
+  }
+  stopSpeaking();
 }
 
 function setupSpeech() {
   const btn = $("speakBtn");
   if (!btn) return;
 
-  if (!("speechSynthesis" in window)) {
-    btn.disabled = true;
-    btn.title = t("a11ySpeakUnsupported");
-    return;
-  }
+  if (hasWebSpeech()) window.speechSynthesis.addEventListener?.("voiceschanged", updateSpeechAvailability);
+  updateSpeechAvailability();
+  $("speakDownloadBtn")?.addEventListener("click", downloadPiperVoice);
 
-  btn.addEventListener("click", () => {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      setSpeakButtonState(false);
+  btn.addEventListener("click", async () => {
+    if (tts.active) {
+      stopSpeaking();
       return;
     }
-    const text = buildSpeechText();
-    if (!text) return;
-    currentUtterance = new SpeechSynthesisUtterance(text);
-    currentUtterance.lang = locale();
-    currentUtterance.onend = () => setSpeakButtonState(false);
-    currentUtterance.onerror = () => setSpeakButtonState(false);
-    setSpeakButtonState(true);
-    window.speechSynthesis.speak(currentUtterance);
+    const parts = buildSpeechParts();
+    if (!parts.length) return;
+    const run = ++tts.run;
+    tts.active = true;
+    await waitForVoices();
+    if (run !== tts.run) return;
+    const voice = pickVoice();
+    const localVoiceReady = !voice && canRunPiper() && (await getStoredVoices()).has(PIPER_VOICES[getLang()]);
+    if (run !== tts.run) return;
+    try {
+      if (voice) speakWithBrowser(voice, parts);
+      else if (localVoiceReady) await speakWithPiper(parts, run);
+      else {
+        // Keine Stimme verfügbar: nie automatisch herunterladen, sondern den
+        // Download-Knopf anbieten.
+        stopSpeaking();
+        updateSpeechAvailability();
+      }
+    } catch (error) {
+      console.error("Sprachausgabe fehlgeschlagen:", error);
+      if (run === tts.run) {
+        stopSpeaking();
+        showSpeakHint(t("a11ySpeakLoadError"));
+      }
+    }
   });
 }
 
-function setSpeakButtonState(speaking) {
+function setSpeakButtonState(state) {
   const btn = $("speakBtn");
   const label = $("speakBtnLabel");
   if (!btn) return;
-  btn.classList.toggle("is-speaking", speaking);
-  if (label) label.textContent = speaking ? t("a11ySpeakStop") : t("a11ySpeak");
+  btn.classList.toggle("is-speaking", state === "speaking");
+  btn.classList.toggle("is-loading", state === "preparing");
+  btn.setAttribute("aria-busy", state === "preparing" ? "true" : "false");
+  if (!label) return;
+  label.textContent =
+    state === "preparing" ? t("a11ySpeakPreparing") : state === "speaking" ? t("a11ySpeakStop") : t("a11ySpeak");
 }
 
 // ---------- Start ----------
@@ -1116,6 +1775,12 @@ loadWarningsData();
 applyStaticTranslations();
 renderWarningsTile();
 renderWarningsModal();
+// Altersangabe der Warnungen mitlaufen lassen (die Daten selbst ändern sich
+// erst mit dem nächsten Seiten-Build).
+setInterval(() => {
+  renderWarningsTile();
+  renderWarningsFootnote();
+}, 60 * 1000);
 
 $("dayModalClose")?.addEventListener("click", closeDayDetail);
 $("dayModalBackdrop")?.addEventListener("click", closeDayDetail);

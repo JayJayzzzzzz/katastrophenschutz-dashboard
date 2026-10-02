@@ -5,9 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
   # Die amtlichen Warnungen (NINA/BBK) werden beim Bauen der Seite geladen
-  # (die API hat kein CORS, ein Live-Fetch im Browser ist nicht möglich) und
-  # damit nur bei jedem Deployment aktualisiert. Ein regelmäßiger Zeitplan
-  # hält sie halbwegs aktuell, ohne einen eigenen Server zu brauchen.
+  # (die API sendet keinen CORS-Header, der Browser darf sie nicht direkt
+  # abrufen) und damit nur bei jedem Deployment aktualisiert. Der Zeitplan
+  # fordert regelmäßig einen neuen Build an. GitHub führt geplante Läufe aber
+  # nicht garantiert pünktlich aus (gemessen: 3–7 Std. Abstand) — deshalb
+  # zeigt das Dashboard das Alter der Warnungen an.
   schedule:
     - cron: "*/30 * * * *"
 
