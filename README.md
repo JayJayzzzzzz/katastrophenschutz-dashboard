@@ -157,6 +157,24 @@ davon nichts: `npm install` lädt nur den Programmcode
 (`@mintplex-labs/piper-tts-web`, `onnxruntime-web` in genau Version 1.18.0,
 passend zur WASM-Datei auf cdnjs).
 
+### Aussprache
+
+Die Sprachausgabe wurde in allen fünf Sprachen von Muttersprachler:innen auf
+korrekte Aussprache geprüft. Dabei fielen im Polnischen Fehler auf, die
+behoben sind:
+
+- **Zahlen** werden in der polnischen Sprachausgabe ausgeschrieben, mit der
+  passenden grammatischen Form (jeden stopień, dwie interwencje, jedno
+  ostrzeżenie). Als Ziffern las Piper z. B. „76“ als ein verschmolzenes Wort,
+  das wie „siedemdziesią-czeszć“ klang.
+- **„trz“** spricht Piper wie „cz“ („powiecza“ statt „powietrza“), weil die
+  Aussprache-Daten (eSpeak) beides gleich umschreiben. Nur für Piper wird es
+  deshalb als „trsz“ geschrieben; Browser-Stimmen bekommen den Originaltext.
+- **Ganzer Bericht in einem Durchgang:** Piper berechnet den Bericht in einem
+  Stück statt Satz für Satz. Allein gesprochen klang der kurze erste Satz wie
+  „Laport“ bzw. „Rapport“ statt „Raport“, im Zusammenhang stimmt es. Dafür
+  beginnt das Vorlesen etwas später (siehe unten).
+
 ### Gemessene Ladezeiten
 
 Gemessen im echten Chrome mit gedrosselter Verbindung (Chrome DevTools
@@ -173,8 +191,10 @@ Protocol), jeweils mit neuem, leerem Browserprofil:
 | 3G 0,4 Mbit/s | 14,4 s | 660 KB | 1,6 s | in einem Stück nach ≈ 10 min abgebrochen; seither abschnittsweise (rechnerisch ≈ 25 min) |
 
 - Der Seitenaufruf lädt vom Sprachmodell nichts.
-- Nach dem Download ist der erste Ton nach 0,4–2,6 s zu hören. Während des
-  Vorlesens und nach einem Neuladen wird nichts mehr nachgeladen.
+- Nach dem Download ist der erste Ton nach 3,7–5,1 s zu hören (gemessen nach
+  einem Neuladen der Seite, Deutsch und Polnisch). Piper berechnet den ganzen
+  Bericht, bevor es ihn abspielt; Satz für Satz waren es 2,1–2,4 s. Während
+  des Vorlesens und nach einem Neuladen wird nichts mehr nachgeladen.
 - Ab etwa 50 Mbit/s bestimmt nicht die eigene Leitung, sondern der Server von
   Hugging Face die Dauer; zwei Messungen derselben Verbindung lagen bis zu
   15 Sekunden auseinander.

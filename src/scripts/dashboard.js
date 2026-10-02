@@ -1285,6 +1285,12 @@ const PIPER_VOICES = {
 // Laufzeit und Aussprache-Daten ≈ 10 MB (gemessen: 71 MB insgesamt).
 const PIPER_VOICE_MB = 60;
 const PIPER_FIRST_MB = 70;
+// Ausspracheregeln nur für Piper (Browser-Stimmen bekommen den Originaltext).
+// Polnisch: Piper schreibt „trz“ mit denselben Lauten wie „cz“, gosia liest
+// „powietrza“ dann wie „powiecza“. Als „trsz“ geschrieben klingt es richtig.
+const PIPER_TEXT_FIXES = {
+  pl: (text) => text.replace(/trz/gi, (m) => m.slice(0, 2) + "sz"),
+};
 
 const tts = {
   active: false,
@@ -1650,16 +1656,16 @@ async function speakWithPiper(parts, run) {
   setSpeakButtonState("preparing");
   const session = await getPiperSession(PIPER_VOICES[getLang()]);
   if (run !== tts.run) return;
+  const fix = PIPER_TEXT_FIXES[getLang()];
+  // Den ganzen Bericht in einem Durchgang berechnen statt Satz für Satz: Steht
+  // „Raport sytuacyjny Berlin.“ allein, spricht gosia es als „Laport“/„Rapport“;
+  // im Zusammenhang klappt es. Über 400 Zeichen teilt Piper selbst an Satzenden.
+  const text = parts.map((part) => (fix ? fix(part) : part)).join(" ");
+  const blob = await session.predict(text);
+  if (run !== tts.run) return;
   setSpeakButtonState("speaking");
-  // Den nächsten Satz berechnen, während der aktuelle abgespielt wird.
-  let next = session.predict(parts[0]);
-  for (let i = 0; i < parts.length; i++) {
-    const blob = await next;
-    if (run !== tts.run) return;
-    next = i + 1 < parts.length ? session.predict(parts[i + 1]) : null;
-    await playBlob(blob, run);
-    if (run !== tts.run) return;
-  }
+  await playBlob(blob, run);
+  if (run !== tts.run) return;
   stopSpeaking();
 }
 

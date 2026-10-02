@@ -606,6 +606,42 @@ function plPlural(n, one, few, many) {
   return mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? few : many;
 }
 
+// Zahlen für die polnische Sprachausgabe ausschreiben. Als Ziffern liest Piper
+// z. B. „76“ als ein Wort („siedemdziesiątsześć“), das t und sz verschmelzen
+// dann zu „cz“. Das Geschlecht des Nomens bestimmt 1 und 2: jeden stopień,
+// jedna interwencja, jedno ostrzeżenie; dwa stopnie, dwie interwencje.
+const PL_UNITS = ["zero", "jeden", "dwa", "trzy", "cztery", "pięć", "sześć", "siedem", "osiem", "dziewięć"];
+const PL_TEENS = ["dziesięć", "jedenaście", "dwanaście", "trzynaście", "czternaście", "piętnaście", "szesnaście", "siedemnaście", "osiemnaście", "dziewiętnaście"];
+const PL_TENS = ["", "", "dwadzieścia", "trzydzieści", "czterdzieści", "pięćdziesiąt", "sześćdziesiąt", "siedemdziesiąt", "osiemdziesiąt", "dziewięćdziesiąt"];
+const PL_HUNDREDS = ["", "sto", "dwieście", "trzysta", "czterysta", "pięćset", "sześćset", "siedemset", "osiemset", "dziewięćset"];
+
+function plBelow1000(n, gender) {
+  const words = [PL_HUNDREDS[Math.floor(n / 100)]];
+  const rest = n % 100;
+  if (rest >= 10 && rest < 20) words.push(PL_TEENS[rest - 10]);
+  else {
+    words.push(PL_TENS[Math.floor(rest / 10)]);
+    const unit = rest % 10;
+    if (unit === 2 && gender === "f") words.push("dwie");
+    else if (unit) words.push(PL_UNITS[unit]);
+  }
+  return words.filter(Boolean).join(" ");
+}
+
+function plNumber(n, gender = "m") {
+  if (!Number.isInteger(n) || Math.abs(n) >= 1e6) return String(n);
+  if (n < 0) return `minus ${plNumber(-n, gender)}`;
+  if (n === 0) return PL_UNITS[0];
+  if (n === 1) return { m: "jeden", f: "jedna", n: "jedno" }[gender];
+  const thousands = Math.floor(n / 1000);
+  const rest = n % 1000;
+  const words = [];
+  if (thousands === 1) words.push("tysiąc");
+  else if (thousands) words.push(plBelow1000(thousands, "m"), plPlural(thousands, "tysiąc", "tysiące", "tysięcy"));
+  if (rest) words.push(plBelow1000(rest, gender));
+  return words.join(" ");
+}
+
 export const SPEECH = {
   intro: {
     de: "Lagebericht Berlin.", en: "Situation report Berlin.", fr: "Rapport de situation Berlin.",
@@ -615,21 +651,21 @@ export const SPEECH = {
     de: (t, c) => `Temperatur ${t} Grad, ${c}.`,
     en: (t, c) => `Temperature ${t} degrees, ${c}.`,
     fr: (t, c) => `Température ${t} degrés, ${c}.`,
-    pl: (t, c) => `Temperatura ${t} ${plPlural(t, "stopień", "stopnie", "stopni")}, ${c}.`,
+    pl: (t, c) => `Temperatura ${plNumber(t, "m")} ${plPlural(t, "stopień", "stopnie", "stopni")}, ${c}.`,
     es: (t, c) => `Temperatura ${t} grados, ${c}.`,
   },
   pegel: {
     de: (v, tr) => `Pegel Spree Köpenick: ${v} Zentimeter, Tendenz ${tr}.`,
     en: (v, tr) => `Spree water level at Köpenick: ${v} centimeters, trend ${tr}.`,
     fr: (v, tr) => `Niveau de la Spree à Köpenick : ${v} centimètres, tendance ${tr}.`,
-    pl: (v, tr) => `Poziom Szprewy w Köpenick: ${v} ${plPlural(v, "centymetr", "centymetry", "centymetrów")}, tendencja ${tr}.`,
+    pl: (v, tr) => `Poziom Szprewy w Köpenick: ${plNumber(v, "m")} ${plPlural(v, "centymetr", "centymetry", "centymetrów")}, tendencja ${tr}.`,
     es: (v, tr) => `Nivel del Spree en Köpenick: ${v} centímetros, tendencia ${tr}.`,
   },
   fire: {
     de: (n) => `Brände gestern: ${n} Einsätze.`,
     en: (n) => `Fires yesterday: ${n} calls.`,
     fr: (n) => `Incendies hier : ${n} interventions.`,
-    pl: (n) => `Pożary wczoraj: ${n} ${plPlural(n, "interwencja", "interwencje", "interwencji")}.`,
+    pl: (n) => `Pożary wczoraj: ${plNumber(n, "f")} ${plPlural(n, "interwencja", "interwencje", "interwencji")}.`,
     es: (n) => `Incendios ayer: ${n} intervenciones.`,
   },
   aqi: {
@@ -644,7 +680,7 @@ export const SPEECH = {
     de: (n, h) => `${n} aktive Warnung${n === 1 ? "" : "en"}: ${h}.`,
     en: (n, h) => `${n} active warning${n === 1 ? "" : "s"}: ${h}.`,
     fr: (n, h) => `${n} alerte${n === 1 ? "" : "s"} active${n === 1 ? "" : "s"} : ${h}.`,
-    pl: (n, h) => `${n} ${plPlural(n, "aktywne ostrzeżenie", "aktywne ostrzeżenia", "aktywnych ostrzeżeń")}: ${h}.`,
+    pl: (n, h) => `${plNumber(n, "n")} ${plPlural(n, "aktywne ostrzeżenie", "aktywne ostrzeżenia", "aktywnych ostrzeżeń")}: ${h}.`,
     es: (n, h) => `${n} aviso${n === 1 ? "" : "s"} activo${n === 1 ? "" : "s"}: ${h}.`,
   },
 };
